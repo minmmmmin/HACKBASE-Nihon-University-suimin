@@ -1,25 +1,89 @@
 import { useState } from "react";
 import { requestRecommendation } from "../api/recommend.js";
+import AiComment from "../components/AiComment.jsx";
 import ConditionsCard from "../components/ConditionsCard.jsx";
+import {
+  CheckCircleIcon,
+  LocationPinIcon,
+  MenuIcon,
+  PencilIcon,
+  PeopleIcon,
+  PersonIcon,
+  SearchIcon,
+  TargetIcon,
+} from "../components/icons.jsx";
 import ShopList from "../components/ShopList.jsx";
 
 // 初期表示に使うサンプル。ユーザーは自由に編集・増減できる。
 const DEFAULT_MEMBERS = [
-  "金欠なので安めがいい。昨日ラーメンを食べたので麺類以外。",
-  "静かに話せる店がいい。駅からあまり歩きたくない。",
+  "安くて美味しいお店がいい！\n落ち着いて話せる雰囲気だと嬉しい。\n和食か定食系が好きです。",
+  "静かな場所がいいです！\n駅から近いと助かる〜\nカフェっぽい雰囲気も気になる",
 ];
+
+// 自由文の最大文字数。
+const MEMBER_MAX_LENGTH = 200;
 
 // 現在地が取得できない場合のフォールバック座標（東京駅付近）。
 const DEFAULT_LOCATION = { lat: 35.658, lng: 139.701 };
 
-// 検索範囲プリセット。codeはホットペッパー準拠（1=300m … 5=3000m）。
+// 検索範囲プリセット。codeはホットペッパー準拠（1=300m … 4=2000m）。
 const RANGE_OPTIONS = [
   { code: 1, label: "300m" },
   { code: 2, label: "500m" },
   { code: 3, label: "1km" },
   { code: 4, label: "2km" },
-  { code: 5, label: "3km" },
 ];
+
+// バックエンド未接続でも結果画面（モック2枚目）を確認できるようにするサンプル。
+// API通信が成功した場合はこの内容を実データで置き換える。
+const SAMPLE_RESULT = {
+  areaLabel: "渋谷周辺",
+  summary:
+    "みんなの希望をまとめると、予算は安めで静かに落ち着いて話せるお店がぴったりでした。麺類は避けたいとのことなので候補から外しています。中でも「和ごはん かえで」は駅近で和食中心と、条件との相性がいちばん高いおすすめです。",
+  conditions: {
+    budgetLevel: "low",
+    excludedGenres: ["麺類"],
+    preferredGenres: [],
+    preferredAtmosphere: ["静かさ", "駅近"],
+    maxWalkingMinutes: null,
+  },
+  shops: [
+    {
+      id: "sample-1",
+      name: "和ごはん かえで",
+      genre: "和食・定食",
+      budget: "安め",
+      access: "徒歩3分（250m）",
+      reason:
+        "落ち着いた雰囲気で会話がしやすく、和食中心でご希望にぴったりです。",
+      distanceMeters: 250,
+      matchScore: 92,
+      iconType: "bowl",
+    },
+    {
+      id: "sample-2",
+      name: "café lume（カフェルメ）",
+      genre: "カフェ・カフェごはん",
+      budget: "安め",
+      access: "徒歩4分（350m）",
+      reason: "カフェのような落ち着いた空間で、駅近＆静かに過ごせます。",
+      distanceMeters: 350,
+      matchScore: 86,
+      iconType: "coffee",
+    },
+    {
+      id: "sample-3",
+      name: "定食や まるや",
+      genre: "定食・和食",
+      budget: "安め",
+      access: "徒歩6分（550m）",
+      reason: "コスパの良い定食が充実！和食好きにおすすめです。",
+      distanceMeters: 550,
+      matchScore: 78,
+      iconType: "bowl",
+    },
+  ],
+};
 
 export default function HomePage() {
   const [members, setMembers] = useState(DEFAULT_MEMBERS);
@@ -33,8 +97,11 @@ export default function HomePage() {
   /** 画面下部の状態表示。kind: "validation" | "error" | null。 */
   const [status, setStatus] = useState(null);
 
-  /** API成功時の推薦結果。{ conditions, shops } | null。 */
-  const [result, setResult] = useState(null);
+  // 結果は常にサンプルで初期化しておき、API成功時に実データへ差し替える。
+  const [result, setResult] = useState(SAMPLE_RESULT);
+
+  const selectedRangeLabel =
+    RANGE_OPTIONS.find((option) => option.code === range)?.label ?? "";
 
   function updateMember(index, value) {
     setMembers((prev) => prev.map((text, i) => (i === index ? value : text)));
@@ -95,13 +162,11 @@ export default function HomePage() {
         message: "少なくとも1人分の希望を入力してください。",
         details: [],
       });
-      setResult(null);
       return;
     }
 
     setLoading(true);
     setStatus(null);
-    setResult(null);
 
     const payload = { location, range, members: filledMembers };
 
@@ -114,6 +179,8 @@ export default function HomePage() {
 
       if (ok) {
         setResult({
+          areaLabel: SAMPLE_RESULT.areaLabel,
+          summary: data.summary,
           conditions: data.conditions,
           shops: Array.isArray(data.shops) ? data.shops : [],
         });
@@ -151,176 +218,240 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-base-200">
-      <div className="navbar bg-primary text-primary-content shadow-md">
-        <div className="mx-auto w-full max-w-2xl px-2">
-          <span className="text-lg font-bold">みんなで決めるお店</span>
-        </div>
-      </div>
+    <div className="min-h-screen bg-base-200 text-base-content">
+      <AppHeader />
 
-      <main className="mx-auto w-full max-w-2xl space-y-4 p-4">
-        <div className="card bg-base-100 shadow-sm">
-          <div className="card-body">
-            <h1 className="card-title">今日どこで食べる？</h1>
-            <p className="text-sm opacity-80">
-              みんなの「食べたい気分」を自由に書くと、生成AIとホットペッパーグルメAPIで、
-              グループみんなが納得しやすいお店を提案します。
-            </p>
-          </div>
-        </div>
+      <main className="mx-auto w-full max-w-md space-y-4 px-4 pb-10 pt-4">
+        {/* ── 入力：みんなの希望 ── */}
+        <SectionLabel icon={<PencilIcon className="h-4 w-4" />}>
+          みんなの希望を入力
+        </SectionLabel>
 
-        <form onSubmit={handleSubmit} className="card bg-base-100 shadow-sm">
-          <div className="card-body space-y-4">
-            {/* 参加者の自由文入力（増減式） */}
-            <div className="space-y-3">
-              <span className="label-text font-semibold">参加者の希望</span>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="card bg-base-100 shadow-sm">
+            <div className="card-body gap-4 p-4">
               {members.map((text, index) => (
                 // 入力欄は並び順で識別するためindexをkeyに用いる。
                 // biome-ignore lint/suspicious/noArrayIndexKey: 動的な入力行のため
-                <div key={index} className="flex items-start gap-2">
-                  <textarea
-                    className="textarea textarea-bordered w-full"
-                    rows={2}
-                    value={text}
-                    onChange={(e) => updateMember(index, e.target.value)}
-                    placeholder={`${index + 1}人目の希望（例：安めがいい。麺類以外。）`}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => removeMember(index)}
-                    disabled={members.length <= 1}
-                    aria-label={`${index + 1}人目を削除`}
-                  >
-                    ✕
-                  </button>
+                <div key={index} className="space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <PersonIcon
+                      className={`h-4 w-4 ${index % 2 === 0 ? "text-primary" : "text-accent"}`}
+                    />
+                    <span className="text-sm font-semibold">
+                      {index + 1}人目
+                    </span>
+                    {members.length > 1 && (
+                      <button
+                        type="button"
+                        className="ml-auto text-xs text-base-content/40 transition hover:text-error"
+                        onClick={() => removeMember(index)}
+                        aria-label={`${index + 1}人目を削除`}
+                      >
+                        削除
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <textarea
+                      className="textarea textarea-bordered w-full resize-none rounded-xl bg-base-100 pb-6 leading-relaxed"
+                      rows={3}
+                      maxLength={MEMBER_MAX_LENGTH}
+                      value={text}
+                      onChange={(e) => updateMember(index, e.target.value)}
+                      placeholder={`${index + 1}人目の希望（例：安めがいい。麺類以外。）`}
+                    />
+                    <span className="pointer-events-none absolute bottom-2 right-3 text-xs text-base-content/40">
+                      {text.length}/{MEMBER_MAX_LENGTH}
+                    </span>
+                  </div>
                 </div>
               ))}
+
               <button
                 type="button"
-                className="btn btn-outline btn-sm"
+                className="w-full rounded-xl border-2 border-dashed border-info/60 py-2.5 text-sm font-semibold text-info transition hover:bg-info/5"
                 onClick={addMember}
               >
                 ＋ 参加者を追加
               </button>
             </div>
+          </div>
 
-            <div className="divider my-0" />
+          {/* ── エリア・現在地 ── */}
+          <div className="card bg-base-100 shadow-sm">
+            <div className="card-body gap-3 p-4">
+              <SectionTitle
+                icon={<LocationPinIcon className="h-4 w-4 text-primary" />}
+              >
+                エリア・現在地
+              </SectionTitle>
 
-            {/* 現在地取得 */}
-            <div className="space-y-2">
-              <span className="label-text font-semibold">現在地</span>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={handleGetLocation}
-                  disabled={geo.kind === "loading"}
-                >
-                  {geo.kind === "loading" && (
-                    <span className="loading loading-spinner loading-xs" />
-                  )}
-                  現在地を取得
-                </button>
-                <span className="text-sm opacity-70">
-                  {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-                  {geo.kind === "success" && "（取得済み）"}
-                  {geo.kind === "idle" && "（東京駅・既定）"}
-                </span>
-              </div>
+              <button
+                type="button"
+                className="btn btn-primary w-full gap-2 rounded-xl"
+                onClick={handleGetLocation}
+                disabled={geo.kind === "loading"}
+              >
+                {geo.kind === "loading" ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <LocationPinIcon className="h-5 w-5" />
+                )}
+                現在地から探す
+              </button>
+
+              {geo.kind === "success" && (
+                <div className="flex items-start gap-2 rounded-xl bg-success/10 px-3 py-2.5">
+                  <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-success" />
+                  <div>
+                    <p className="text-sm font-semibold text-success">
+                      現在地を取得しました
+                    </p>
+                    <p className="text-xs text-base-content/60">
+                      {location.lat.toFixed(4)}, {location.lng.toFixed(4)} 付近
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {geo.kind === "error" && (
                 <p className="text-sm text-error">{geo.message}</p>
               )}
             </div>
+          </div>
 
-            {/* 検索範囲選択 */}
-            <div className="space-y-2">
-              <span className="label-text font-semibold">検索範囲</span>
-              <div className="join">
-                {RANGE_OPTIONS.map((option) => (
-                  <button
-                    key={option.code}
-                    type="button"
-                    className={`btn join-item btn-sm ${
-                      range === option.code ? "btn-primary" : "btn-outline"
-                    }`}
-                    onClick={() => setRange(option.code)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+          {/* ── 検索範囲 ── */}
+          <div className="card bg-base-100 shadow-sm">
+            <div className="card-body gap-3 p-4">
+              <SectionTitle
+                icon={<TargetIcon className="h-4 w-4 text-primary" />}
+              >
+                検索範囲
+              </SectionTitle>
+
+              <div className="grid grid-cols-4 gap-2">
+                {RANGE_OPTIONS.map((option) => {
+                  const active = range === option.code;
+                  return (
+                    <button
+                      key={option.code}
+                      type="button"
+                      className={`rounded-xl py-2 text-sm font-semibold transition ${
+                        active
+                          ? "bg-primary text-primary-content shadow-sm"
+                          : "bg-base-200 text-base-content/70 hover:bg-base-300"
+                      }`}
+                      onClick={() => setRange(option.code)}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-
-            <button
-              type="submit"
-              className="btn btn-primary w-full"
-              disabled={loading}
-            >
-              {loading && (
-                <span className="loading loading-spinner loading-sm" />
-              )}
-              {loading ? "提案を作成中..." : "お店を提案してもらう"}
-            </button>
           </div>
+
+          <button
+            type="submit"
+            className="btn btn-accent w-full gap-2 rounded-xl text-base shadow-md"
+            disabled={loading}
+          >
+            {loading ? (
+              <span className="loading loading-spinner loading-sm" />
+            ) : (
+              <SearchIcon className="h-5 w-5" />
+            )}
+            {loading ? "お店を探しています..." : "お店を探す"}
+          </button>
         </form>
 
-        <StatusArea loading={loading} status={status} />
+        {status && <StatusArea status={status} />}
 
+        {/* ── 結果：みんなの希望まとめ＋店舗候補 ── */}
         {result && (
-          <>
+          <div className="space-y-4 pt-2">
             <ConditionsCard conditions={result.conditions} />
-            <ShopList shops={result.shops} />
-          </>
+            <AiComment comment={result.summary} />
+            <ShopList
+              shops={result.shops}
+              areaLabel={result.areaLabel}
+              rangeLabel={selectedRangeLabel}
+            />
+          </div>
         )}
       </main>
     </div>
   );
 }
 
-/**
- * API通信中・エラー・入力エラーの表示領域。
- *
- * @param {{ loading: boolean, status: any }} props
- */
-function StatusArea({ loading, status }) {
-  if (loading) {
-    return (
-      <div className="alert">
-        <span className="loading loading-spinner loading-sm" />
-        <span>お店を探しています...</span>
+/** アプリ共通ヘッダー。 */
+function AppHeader() {
+  return (
+    <header className="sticky top-0 z-10 border-b border-base-300 bg-base-100/95 backdrop-blur">
+      <div className="mx-auto flex w-full max-w-md items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-2">
+          <PeopleIcon className="h-6 w-6 text-accent" />
+          <span className="text-lg font-bold">みんなで決めるお店</span>
+        </div>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm btn-square"
+          aria-label="メニュー"
+        >
+          <MenuIcon className="h-5 w-5" />
+        </button>
       </div>
-    );
-  }
+    </header>
+  );
+}
 
-  if (!status) {
-    return null;
-  }
+/** カードの外に置く、うっすらしたセクションラベル。 */
+function SectionLabel({ icon, children }) {
+  return (
+    <div className="flex items-center gap-1.5 text-sm font-semibold text-base-content/70">
+      <span>{icon}</span>
+      <span>{children}</span>
+    </div>
+  );
+}
 
+/** カード内の見出し（アイコン＋太字）。 */
+function SectionTitle({ icon, children }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {icon}
+      <span className="font-semibold">{children}</span>
+    </div>
+  );
+}
+
+/**
+ * 入力エラー・通信エラーの表示領域。
+ * @param {{ status: { kind: string, message: string, details?: any[] } }} props
+ */
+function StatusArea({ status }) {
   if (status.kind === "validation") {
     return (
-      <div className="alert alert-error">
-        <div className="flex flex-col items-start gap-2">
-          <span className="badge badge-outline">入力エラー</span>
-          <span>{status.message}</span>
-          {status.details.length > 0 && (
-            <ul className="list-disc pl-5 text-sm">
-              {status.details.map((detail) => (
-                <li key={detail.path}>
-                  <span className="font-mono">{detail.path}</span>:{" "}
-                  {detail.message}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      <div className="rounded-2xl border border-error/40 bg-error/10 p-3 text-sm">
+        <p className="font-semibold text-error">{status.message}</p>
+        {status.details?.length > 0 && (
+          <ul className="mt-1 list-disc pl-5 text-base-content/70">
+            {status.details.map((detail) => (
+              <li key={detail.path}>
+                <span className="font-mono">{detail.path}</span>:{" "}
+                {detail.message}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="alert alert-error">
-      <span>{status.message}</span>
+    <div className="rounded-2xl border border-error/40 bg-error/10 p-3 text-sm text-error">
+      {status.message}
     </div>
   );
 }

@@ -1,5 +1,8 @@
+import { BanIcon, HeartIcon, SparklesIcon, YenIcon } from "./icons.jsx";
+
 /**
- * AIが自由文から整理した検索条件（GroupPreference）を表示するカード。
+ * AIが自由文から整理した検索条件（GroupPreference）を
+ * 「みんなの希望まとめ」カードとして表示する。
  *
  * @param {{ conditions: {
  *   budgetLevel: "low" | "medium" | "high" | "any",
@@ -10,55 +13,27 @@
  * } }} props
  */
 export default function ConditionsCard({ conditions }) {
-  const {
-    budgetLevel,
-    excludedGenres,
-    preferredGenres,
-    preferredAtmosphere,
-    maxWalkingMinutes,
-  } = conditions;
+  const chips = buildChips(conditions);
 
   return (
-    <div className="card bg-base-100 shadow-sm">
-      <div className="card-body space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="badge badge-primary">AIが整理した条件</span>
-          <h2 className="card-title text-base">みんなの希望まとめ</h2>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <ConditionRow label="予算感">
-            <span className="badge badge-outline">
-              {BUDGET_LABEL[budgetLevel]}
-            </span>
-          </ConditionRow>
-
-          <ConditionRow label="徒歩時間">
-            <span className="badge badge-outline">
-              {maxWalkingMinutes == null
-                ? "指定なし"
-                : `${maxWalkingMinutes}分以内`}
-            </span>
-          </ConditionRow>
-
-          <ConditionRow label="希望ジャンル">
-            <TagList items={preferredGenres} emptyText="こだわりなし" />
-          </ConditionRow>
-
-          <ConditionRow label="避けたいジャンル">
-            <TagList
-              items={excludedGenres}
-              emptyText="なし"
-              tone="badge-error badge-outline"
-            />
-          </ConditionRow>
-
-          <ConditionRow label="雰囲気">
-            <TagList items={preferredAtmosphere} emptyText="こだわりなし" />
-          </ConditionRow>
-        </div>
+    <section className="rounded-2xl border-2 border-warning/45 bg-warning/[0.06] p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <SparklesIcon className="h-5 w-5 text-warning" />
+        <h2 className="font-bold">みんなの希望まとめ</h2>
       </div>
-    </div>
+
+      <div className="flex flex-col items-start gap-2">
+        {chips.map((chip) => (
+          <span
+            key={chip.key}
+            className="inline-flex items-center gap-1.5 rounded-full bg-base-100 px-3 py-1.5 text-sm shadow-sm"
+          >
+            <chip.Icon className={`h-4 w-4 shrink-0 ${chip.iconTone}`} />
+            <span className="font-medium">{chip.label}</span>
+          </span>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -71,29 +46,49 @@ const BUDGET_LABEL = {
 };
 
 /**
- * 条件1項目（ラベル + 値）の行。
- * @param {{ label: string, children: import("react").ReactNode }} props
+ * conditions からサマリー用のチップ配列を組み立てる。
+ * 予算・避けたいジャンル・重視ポイント（雰囲気＋希望ジャンル）を並べる。
+ * ラベル文字は既定色のまま、アイコンだけ意味に応じて色付けする。
+ *
+ * @param {ConditionsCard の conditions} conditions
+ * @returns {{ key: string, Icon: Function, iconTone: string, label: string }[]}
  */
-function ConditionRow({ label, children }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs font-semibold opacity-60">{label}</span>
-      <div className="flex flex-wrap gap-1">{children}</div>
-    </div>
-  );
-}
+function buildChips(conditions) {
+  const {
+    budgetLevel,
+    excludedGenres = [],
+    preferredGenres = [],
+    preferredAtmosphere = [],
+  } = conditions;
 
-/**
- * 文字列配列をバッジで並べる。空の場合はemptyTextを表示。
- * @param {{ items: string[], emptyText: string, tone?: string }} props
- */
-function TagList({ items, emptyText, tone = "badge-ghost" }) {
-  if (items.length === 0) {
-    return <span className="text-sm opacity-60">{emptyText}</span>;
+  const chips = [
+    {
+      key: "budget",
+      Icon: YenIcon,
+      iconTone: "text-success",
+      label: `予算：${BUDGET_LABEL[budgetLevel] ?? "こだわりなし"}`,
+    },
+  ];
+
+  for (const genre of excludedGenres) {
+    chips.push({
+      key: `exclude-${genre}`,
+      Icon: BanIcon,
+      iconTone: "text-error",
+      label: `避けたい：${genre}`,
+    });
   }
-  return items.map((item) => (
-    <span key={item} className={`badge ${tone}`}>
-      {item}
-    </span>
-  ));
+
+  // 重視ポイントは「雰囲気」と「希望ジャンル」をまとめて1チップに集約する。
+  const emphasis = [...preferredAtmosphere, ...preferredGenres];
+  if (emphasis.length > 0) {
+    chips.push({
+      key: "emphasis",
+      Icon: HeartIcon,
+      iconTone: "text-success",
+      label: `重視：${emphasis.join("・")}`,
+    });
+  }
+
+  return chips;
 }

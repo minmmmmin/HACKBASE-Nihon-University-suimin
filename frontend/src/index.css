@@ -1,4 +1,28 @@
 @import "tailwindcss";
+
 @plugin "daisyui" {
-  themes: cupcake --default;
+  themes: light --default;
+}
+
+:root[data-theme="light"] {
+  --color-primary: #12897a; /* ティール：現在地・選択中・詳細リンクなど */
+  --color-primary-content: #ffffff;
+  --color-secondary: #f2921e; /* オレンジ */
+  --color-secondary-content: #ffffff;
+  --color-accent: #f2921e; /* オレンジ：ロゴ・「お店を探す」CTA */
+  --color-accent-content: #ffffff;
+  --color-base-100: #ffffff; /* カード地 */
+  --color-base-200: #fbf6ec; /* 画面背景（クリーム） */
+  --color-base-300: #efe6d4; /* 罫線・境界 */
+  --color-base-content: #3f3a34;
+  --color-success: #3da35d;
+  --color-success-content: #ffffff;
+  --color-error: #e24b4b;
+  --color-error-content: #ffffff;
+  --color-warning: #f2921e;
+  --color-warning-content: #ffffff;
+  --color-info: #3b82c4;
+  --color-info-content: #ffffff;
+  --radius-box: 1rem;
+  --radius-field: 0.75rem;
 }
