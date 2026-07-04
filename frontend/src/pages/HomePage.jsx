@@ -4,6 +4,7 @@ import AiComment from "../components/AiComment.jsx";
 import ConditionsCard from "../components/ConditionsCard.jsx";
 import {
   CheckCircleIcon,
+  HistoryIcon,
   LocationPinIcon,
   MenuIcon,
   PencilIcon,
@@ -219,184 +220,219 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-base-200 text-base-content">
-      <AppHeader />
+      <SiteHeader />
 
-      <main className="mx-auto w-full max-w-md space-y-4 px-4 pb-10 pt-4">
-        {/* ── 入力：みんなの希望 ── */}
-        <SectionLabel icon={<PencilIcon className="h-4 w-4" />}>
-          みんなの希望を入力
-        </SectionLabel>
+      <main className="mx-auto w-full max-w-md px-4 pb-12 pt-4 lg:max-w-6xl lg:px-8 lg:pt-8">
+        {/* モバイルは縦積み、デスクトップは「入力（左）／結果（右）」の2カラム。 */}
+        <div className="lg:grid lg:grid-cols-[minmax(340px,380px)_1fr] lg:items-start lg:gap-8">
+          {/* ── 入力パネル（左） ── */}
+          <div className="space-y-4 lg:sticky lg:top-24">
+            <SectionLabel icon={<PencilIcon className="h-4 w-4" />}>
+              みんなの希望を入力
+            </SectionLabel>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="card bg-base-100 shadow-sm">
-            <div className="card-body gap-4 p-4">
-              {members.map((text, index) => (
-                // 入力欄は並び順で識別するためindexをkeyに用いる。
-                // biome-ignore lint/suspicious/noArrayIndexKey: 動的な入力行のため
-                <div key={index} className="space-y-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <PersonIcon
-                      className={`h-4 w-4 ${index % 2 === 0 ? "text-primary" : "text-accent"}`}
-                    />
-                    <span className="text-sm font-semibold">
-                      {index + 1}人目
-                    </span>
-                    {members.length > 1 && (
-                      <button
-                        type="button"
-                        className="ml-auto text-xs text-base-content/40 transition hover:text-error"
-                        onClick={() => removeMember(index)}
-                        aria-label={`${index + 1}人目を削除`}
-                      >
-                        削除
-                      </button>
-                    )}
-                  </div>
-                  <div className="relative">
-                    <textarea
-                      className="textarea textarea-bordered w-full resize-none rounded-xl bg-base-100 pb-6 leading-relaxed"
-                      rows={3}
-                      maxLength={MEMBER_MAX_LENGTH}
-                      value={text}
-                      onChange={(e) => updateMember(index, e.target.value)}
-                      placeholder={`${index + 1}人目の希望（例：安めがいい。麺類以外。）`}
-                    />
-                    <span className="pointer-events-none absolute bottom-2 right-3 text-xs text-base-content/40">
-                      {text.length}/{MEMBER_MAX_LENGTH}
-                    </span>
-                  </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="card bg-base-100 shadow-sm">
+                <div className="card-body gap-4 p-4">
+                  {members.map((text, index) => (
+                    // 入力欄は並び順で識別するためindexをkeyに用いる。
+                    // biome-ignore lint/suspicious/noArrayIndexKey: 動的な入力行のため
+                    <div key={index} className="space-y-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <PersonIcon
+                          className={`h-4 w-4 ${index % 2 === 0 ? "text-primary" : "text-accent"}`}
+                        />
+                        <span className="text-sm font-semibold">
+                          {index + 1}人目
+                        </span>
+                        {members.length > 1 && (
+                          <button
+                            type="button"
+                            className="ml-auto text-xs text-base-content/40 transition hover:text-error"
+                            onClick={() => removeMember(index)}
+                            aria-label={`${index + 1}人目を削除`}
+                          >
+                            削除
+                          </button>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <textarea
+                          className="textarea textarea-bordered w-full resize-none rounded-xl bg-base-100 pb-6 leading-relaxed"
+                          rows={3}
+                          maxLength={MEMBER_MAX_LENGTH}
+                          value={text}
+                          onChange={(e) => updateMember(index, e.target.value)}
+                          placeholder={`${index + 1}人目の希望（例：安めがいい。麺類以外。）`}
+                        />
+                        <span className="pointer-events-none absolute bottom-2 right-3 text-xs text-base-content/40">
+                          {text.length}/{MEMBER_MAX_LENGTH}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    className="w-full rounded-xl border-2 border-dashed border-info/60 py-2.5 text-sm font-semibold text-info transition hover:bg-info/5"
+                    onClick={addMember}
+                  >
+                    ＋ 参加者を追加
+                  </button>
                 </div>
-              ))}
-
-              <button
-                type="button"
-                className="w-full rounded-xl border-2 border-dashed border-info/60 py-2.5 text-sm font-semibold text-info transition hover:bg-info/5"
-                onClick={addMember}
-              >
-                ＋ 参加者を追加
-              </button>
-            </div>
-          </div>
-
-          {/* ── エリア・現在地 ── */}
-          <div className="card bg-base-100 shadow-sm">
-            <div className="card-body gap-3 p-4">
-              <SectionTitle
-                icon={<LocationPinIcon className="h-4 w-4 text-primary" />}
-              >
-                エリア・現在地
-              </SectionTitle>
-
-              <button
-                type="button"
-                className="btn btn-primary w-full gap-2 rounded-xl"
-                onClick={handleGetLocation}
-                disabled={geo.kind === "loading"}
-              >
-                {geo.kind === "loading" ? (
-                  <span className="loading loading-spinner loading-xs" />
-                ) : (
-                  <LocationPinIcon className="h-5 w-5" />
-                )}
-                現在地から探す
-              </button>
-
-              {geo.kind === "success" && (
-                <div className="flex items-start gap-2 rounded-xl bg-success/10 px-3 py-2.5">
-                  <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-success" />
-                  <div>
-                    <p className="text-sm font-semibold text-success">
-                      現在地を取得しました
-                    </p>
-                    <p className="text-xs text-base-content/60">
-                      {location.lat.toFixed(4)}, {location.lng.toFixed(4)} 付近
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {geo.kind === "error" && (
-                <p className="text-sm text-error">{geo.message}</p>
-              )}
-            </div>
-          </div>
-
-          {/* ── 検索範囲 ── */}
-          <div className="card bg-base-100 shadow-sm">
-            <div className="card-body gap-3 p-4">
-              <SectionTitle
-                icon={<TargetIcon className="h-4 w-4 text-primary" />}
-              >
-                検索範囲
-              </SectionTitle>
-
-              <div className="grid grid-cols-4 gap-2">
-                {RANGE_OPTIONS.map((option) => {
-                  const active = range === option.code;
-                  return (
-                    <button
-                      key={option.code}
-                      type="button"
-                      className={`rounded-xl py-2 text-sm font-semibold transition ${
-                        active
-                          ? "bg-primary text-primary-content shadow-sm"
-                          : "bg-base-200 text-base-content/70 hover:bg-base-300"
-                      }`}
-                      onClick={() => setRange(option.code)}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
               </div>
-            </div>
+
+              {/* ── エリア・現在地 ── */}
+              <div className="card bg-base-100 shadow-sm">
+                <div className="card-body gap-3 p-4">
+                  <SectionTitle
+                    icon={<LocationPinIcon className="h-4 w-4 text-primary" />}
+                  >
+                    エリア・現在地
+                  </SectionTitle>
+
+                  <button
+                    type="button"
+                    className="btn btn-primary w-full gap-2 rounded-xl"
+                    onClick={handleGetLocation}
+                    disabled={geo.kind === "loading"}
+                  >
+                    {geo.kind === "loading" ? (
+                      <span className="loading loading-spinner loading-xs" />
+                    ) : (
+                      <LocationPinIcon className="h-5 w-5" />
+                    )}
+                    現在地から探す
+                  </button>
+
+                  {geo.kind === "success" && (
+                    <div className="flex items-start gap-2 rounded-xl bg-success/10 px-3 py-2.5">
+                      <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-success" />
+                      <div>
+                        <p className="text-sm font-semibold text-success">
+                          現在地を取得しました
+                        </p>
+                        <p className="text-xs text-base-content/60">
+                          {location.lat.toFixed(4)}, {location.lng.toFixed(4)}{" "}
+                          付近
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {geo.kind === "error" && (
+                    <p className="text-sm text-error">{geo.message}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* ── 検索範囲 ── */}
+              <div className="card bg-base-100 shadow-sm">
+                <div className="card-body gap-3 p-4">
+                  <SectionTitle
+                    icon={<TargetIcon className="h-4 w-4 text-primary" />}
+                  >
+                    検索範囲
+                  </SectionTitle>
+
+                  <div className="grid grid-cols-4 gap-2">
+                    {RANGE_OPTIONS.map((option) => {
+                      const active = range === option.code;
+                      return (
+                        <button
+                          key={option.code}
+                          type="button"
+                          className={`rounded-xl py-2 text-sm font-semibold transition ${
+                            active
+                              ? "bg-primary text-primary-content shadow-sm"
+                              : "bg-base-200 text-base-content/70 hover:bg-base-300"
+                          }`}
+                          onClick={() => setRange(option.code)}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-accent w-full gap-2 rounded-xl text-base shadow-md"
+                disabled={loading}
+              >
+                {loading ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : (
+                  <SearchIcon className="h-5 w-5" />
+                )}
+                {loading ? "お店を探しています..." : "お店を探す"}
+              </button>
+            </form>
           </div>
 
-          <button
-            type="submit"
-            className="btn btn-accent w-full gap-2 rounded-xl text-base shadow-md"
-            disabled={loading}
-          >
-            {loading ? (
-              <span className="loading loading-spinner loading-sm" />
-            ) : (
-              <SearchIcon className="h-5 w-5" />
+          {/* ── 結果パネル（右） ── */}
+          <div className="mt-4 space-y-4 lg:mt-0">
+            {status && <StatusArea status={status} />}
+
+            {/* 結果：みんなの希望まとめ＋AIコメント＋店舗候補 */}
+            {result && (
+              <>
+                <ConditionsCard conditions={result.conditions} />
+                <AiComment comment={result.summary} />
+                <ShopList
+                  shops={result.shops}
+                  areaLabel={result.areaLabel}
+                  rangeLabel={selectedRangeLabel}
+                />
+              </>
             )}
-            {loading ? "お店を探しています..." : "お店を探す"}
-          </button>
-        </form>
 
-        {status && <StatusArea status={status} />}
-
-        {/* ── 結果：みんなの希望まとめ＋店舗候補 ── */}
-        {result && (
-          <div className="space-y-4 pt-2">
-            <ConditionsCard conditions={result.conditions} />
-            <AiComment comment={result.summary} />
-            <ShopList
-              shops={result.shops}
-              areaLabel={result.areaLabel}
-              rangeLabel={selectedRangeLabel}
-            />
+            <p className="pt-1 text-center text-xs text-base-content/50 lg:text-left">
+              ※表示されている距離は直線距離です。実際の徒歩時間とは異なる場合があります。
+            </p>
           </div>
-        )}
+        </div>
       </main>
     </div>
   );
 }
 
-/** アプリ共通ヘッダー。 */
-function AppHeader() {
+/** サイト共通ヘッダー。デスクトップはナビ＋履歴ボタン、モバイルはメニューを表示。 */
+function SiteHeader() {
   return (
-    <header className="sticky top-0 z-10 border-b border-base-300 bg-base-100/95 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-md items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-2">
-          <PeopleIcon className="h-6 w-6 text-accent" />
-          <span className="text-lg font-bold">みんなで決めるお店</span>
+    <header className="sticky top-0 z-20 border-b border-base-300 bg-base-100/95 backdrop-blur">
+      <div className="mx-auto flex w-full max-w-md items-center justify-between px-4 py-3 lg:max-w-6xl lg:px-8">
+        <div className="flex items-center gap-2 lg:gap-3">
+          <PeopleIcon className="h-6 w-6 text-accent lg:h-7 lg:w-7" />
+          <span className="text-lg font-bold lg:text-xl">
+            みんなで決めるお店
+          </span>
+          <nav className="ml-4 hidden items-center gap-5 text-sm text-base-content/70 lg:flex">
+            <a href="#使い方" className="transition hover:text-base-content">
+              使い方
+            </a>
+            <a
+              href="#よくある質問"
+              className="transition hover:text-base-content"
+            >
+              よくある質問
+            </a>
+          </nav>
         </div>
+
+        {/* デスクトップ：履歴ボタン／モバイル：メニュー */}
         <button
           type="button"
-          className="btn btn-ghost btn-sm btn-square"
+          className="hidden items-center gap-1.5 rounded-lg border border-base-300 px-3 py-1.5 text-sm font-medium transition hover:bg-base-200 lg:inline-flex"
+        >
+          <HistoryIcon className="h-4 w-4" />
+          履歴を見る
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm btn-square lg:hidden"
           aria-label="メニュー"
         >
           <MenuIcon className="h-5 w-5" />

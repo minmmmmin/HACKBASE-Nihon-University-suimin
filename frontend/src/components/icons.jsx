@@ -194,6 +194,17 @@ export function CoffeeIcon({ className }) {
   );
 }
 
+/** 履歴（時計＋戻る矢印）。 */
+export function HistoryIcon({ className }) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M3 3v5h5" />
+      <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+      <path d="M12 7v5l3 2" />
+    </StrokeIcon>
+  );
+}
+
 /** フォーク＆ナイフ（サムネ既定）。 */
 export function UtensilsIcon({ className }) {
   return (

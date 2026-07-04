@@ -22,7 +22,7 @@ export default function ConditionsCard({ conditions }) {
         <h2 className="font-bold">みんなの希望まとめ</h2>
       </div>
 
-      <div className="flex flex-col items-start gap-2">
+      <div className="flex flex-col items-start gap-2 lg:flex-row lg:flex-wrap lg:items-center">
         {chips.map((chip) => (
           <span
             key={chip.key}
