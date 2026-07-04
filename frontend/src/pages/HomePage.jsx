@@ -4,16 +4,14 @@ import AiComment from "../components/AiComment.jsx";
 import ConditionsCard from "../components/ConditionsCard.jsx";
 import {
   CheckCircleIcon,
-  HistoryIcon,
   LocationPinIcon,
-  MenuIcon,
   PencilIcon,
-  PeopleIcon,
   PersonIcon,
   SearchIcon,
   TargetIcon,
 } from "../components/icons.jsx";
 import ShopList from "../components/ShopList.jsx";
+import SiteHeader from "../components/SiteHeader.jsx";
 
 // 初期表示に使うサンプル。ユーザーは自由に編集・増減できる。
 const DEFAULT_MEMBERS = [
@@ -417,53 +415,6 @@ export default function HomePage() {
         )}
       </main>
     </div>
-  );
-}
-
-/** サイト共通ヘッダー。デスクトップはナビ＋履歴ボタン、モバイルはメニューを表示。 */
-function SiteHeader() {
-  return (
-    <>
-      <header className="fixed inset-x-0 top-0 z-30 border-b border-base-300 bg-base-100/95 backdrop-blur">
-        <div className="mx-auto flex h-16 w-full max-w-md items-center justify-between px-4 lg:max-w-6xl lg:px-8">
-        <div className="flex items-center gap-2 lg:gap-3">
-          <PeopleIcon className="h-6 w-6 text-accent lg:h-7 lg:w-7" />
-          <span className="text-lg font-bold lg:text-xl">
-            みんなで決めるお店
-          </span>
-          <nav className="ml-4 hidden items-center gap-5 text-sm text-base-content/70 lg:flex">
-            <a href="#使い方" className="transition hover:text-base-content">
-              使い方
-            </a>
-            <a
-              href="#よくある質問"
-              className="transition hover:text-base-content"
-            >
-              よくある質問
-            </a>
-          </nav>
-        </div>
-
-        {/* デスクトップ：履歴ボタン／モバイル：メニュー */}
-        <button
-          type="button"
-          className="hidden items-center gap-1.5 rounded-lg border border-base-300 px-3 py-1.5 text-sm font-medium transition hover:bg-base-200 lg:inline-flex"
-        >
-          <HistoryIcon className="h-4 w-4" />
-          履歴を見る
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm btn-square lg:hidden"
-          aria-label="メニュー"
-        >
-          <MenuIcon className="h-5 w-5" />
-        </button>
-        </div>
-      </header>
-      {/* fixedヘッダーの高さ分だけ本文を押し下げるスペーサー */}
-      <div className="h-16" aria-hidden />
-    </>
   );
 }
 

@@ -214,3 +214,64 @@ export function UtensilsIcon({ className }) {
     </StrokeIcon>
   );
 }
+
+/** 開いた本（使い方）。 */
+export function BookIcon({ className }) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M12 6.5C10.5 5 8.5 4.5 6.5 4.5 5 4.5 3.5 4.8 2.5 5.3v13c1-.5 2.5-.8 4-.8 2 0 4 .5 5.5 2 1.5-1.5 3.5-2 5.5-2 1.5 0 3 .3 4 .8v-13c-1-.5-2.5-.8-4-.8-2 0-4 .5-5.5 2Z" />
+      <path d="M12 6.5v13" />
+    </StrokeIcon>
+  );
+}
+
+/** ？付き円（よくある質問）。 */
+export function QuestionIcon({ className }) {
+  return (
+    <StrokeIcon className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9a2.5 2.5 0 0 1 4.5 1.5c0 1.5-2 2-2 3" />
+      <path d="M12 17h.01" />
+    </StrokeIcon>
+  );
+}
+
+/** ホーム（家）。 */
+export function HomeIcon({ className }) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M3 11l9-8 9 8" />
+      <path d="M5 10v10h5v-6h4v6h5V10" />
+    </StrokeIcon>
+  );
+}
+
+/** 右向き矢印。 */
+export function ArrowRightIcon({ className }) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M5 12h14" />
+      <path d="m13 6 6 6-6 6" />
+    </StrokeIcon>
+  );
+}
+
+/** 吹き出し（希望・自由文）。 */
+export function ChatIcon({ className }) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7A8.5 8.5 0 0 1 12.5 3 8.38 8.38 0 0 1 21 11.5Z" />
+    </StrokeIcon>
+  );
+}
+
+/** 電球（ヒント）。 */
+export function BulbIcon({ className }) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M9 18h6" />
+      <path d="M10 22h4" />
+      <path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2v.3h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2Z" />
+    </StrokeIcon>
+  );
+}
