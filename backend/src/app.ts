@@ -1,5 +1,5 @@
-import express from "express";
 import cors from "cors";
+import express from "express";
 
 import router from "./routes/recommend.js";
 
@@ -25,12 +25,19 @@ app.use((_req, res) => {
 });
 
 // Error Handler
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error(err);
+app.use(
+  (
+    err: Error,
+    _req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction,
+  ) => {
+    console.error(err);
 
-  res.status(500).json({
-    error: "Internal Server Error",
-  });
-});
+    res.status(500).json({
+      error: "Internal Server Error",
+    });
+  },
+);
 
 export default app;

@@ -1,42 +1,121 @@
 import { useState } from "react";
 import { requestRecommendation } from "../api/recommend.js";
+import ConditionsCard from "../components/ConditionsCard.jsx";
+import ShopList from "../components/ShopList.jsx";
 
-const DEFAULT_MEMBER_1 =
-  "金欠なので安めがいい。昨日ラーメンを食べたので麺類以外。";
-const DEFAULT_MEMBER_2 = "静かに話せる店がいい。駅からあまり歩きたくない。";
+// 初期表示に使うサンプル。ユーザーは自由に編集・増減できる。
+const DEFAULT_MEMBERS = [
+  "金欠なので安めがいい。昨日ラーメンを食べたので麺類以外。",
+  "静かに話せる店がいい。駅からあまり歩きたくない。",
+];
 
-// 位置情報はUIから入力しない。将来Geolocation APIで取得する予定のため、
-// 現時点では東京駅付近のデフォルト座標を送信する。
+// 現在地が取得できない場合のフォールバック座標（東京駅付近）。
 const DEFAULT_LOCATION = { lat: 35.658, lng: 139.701 };
 
+// 検索範囲プリセット。codeはホットペッパー準拠（1=300m … 5=3000m）。
+const RANGE_OPTIONS = [
+  { code: 1, label: "300m" },
+  { code: 2, label: "500m" },
+  { code: 3, label: "1km" },
+  { code: 4, label: "2km" },
+  { code: 5, label: "3km" },
+];
+
 export default function HomePage() {
-  const [member1, setMember1] = useState(DEFAULT_MEMBER_1);
-  const [member2, setMember2] = useState(DEFAULT_MEMBER_2);
+  const [members, setMembers] = useState(DEFAULT_MEMBERS);
+  const [location, setLocation] = useState(DEFAULT_LOCATION);
+  const [range, setRange] = useState(3);
   const [loading, setLoading] = useState(false);
 
-  /**
-   * 画面下部に表示する状態。
-   * kind: "notImplemented" | "validation" | "error" のいずれか。
-   */
+  /** 現在地取得の状態: { kind: "idle" | "loading" | "success" | "error", message?: string } */
+  const [geo, setGeo] = useState({ kind: "idle" });
+
+  /** 画面下部の状態表示。kind: "validation" | "error" | null。 */
   const [status, setStatus] = useState(null);
+
+  /** API成功時の推薦結果。{ conditions, shops } | null。 */
+  const [result, setResult] = useState(null);
+
+  function updateMember(index, value) {
+    setMembers((prev) => prev.map((text, i) => (i === index ? value : text)));
+  }
+
+  function addMember() {
+    setMembers((prev) => [...prev, ""]);
+  }
+
+  function removeMember(index) {
+    // 参加者は最低1人を維持する。
+    setMembers((prev) =>
+      prev.length <= 1 ? prev : prev.filter((_, i) => i !== index),
+    );
+  }
+
+  function handleGetLocation() {
+    if (!navigator.geolocation) {
+      setGeo({
+        kind: "error",
+        message: "この端末では位置情報を取得できません。",
+      });
+      return;
+    }
+
+    setGeo({ kind: "loading" });
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+        setGeo({ kind: "success" });
+      },
+      (error) => {
+        const message =
+          error.code === error.PERMISSION_DENIED
+            ? "位置情報の利用が許可されませんでした。東京駅を基準に検索します。"
+            : "位置情報を取得できませんでした。東京駅を基準に検索します。";
+        setGeo({ kind: "error", message });
+      },
+      { enableHighAccuracy: false, timeout: 10000 },
+    );
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
+
+    // 空欄を除いた参加者だけを送信対象にする。
+    const filledMembers = members
+      .map((text) => text.trim())
+      .filter((text) => text.length > 0)
+      .map((text) => ({ text }));
+
+    if (filledMembers.length === 0) {
+      setStatus({
+        kind: "validation",
+        message: "少なくとも1人分の希望を入力してください。",
+        details: [],
+      });
+      setResult(null);
+      return;
+    }
+
     setLoading(true);
     setStatus(null);
+    setResult(null);
 
-    const payload = {
-      location: DEFAULT_LOCATION,
-      members: [{ text: member1 }, { text: member2 }],
-    };
+    const payload = { location, range, members: filledMembers };
 
     try {
-      const { status: httpStatus, data } = await requestRecommendation(payload);
+      const {
+        ok,
+        status: httpStatus,
+        data,
+      } = await requestRecommendation(payload);
 
-      if (httpStatus === 501) {
-        setStatus({
-          kind: "notImplemented",
-          message: data?.message ?? "店舗推薦機能はまだ実装されていません",
+      if (ok) {
+        setResult({
+          conditions: data.conditions,
+          shops: Array.isArray(data.shops) ? data.shops : [],
         });
       } else if (httpStatus === 400) {
         setStatus({
@@ -92,27 +171,86 @@ export default function HomePage() {
 
         <form onSubmit={handleSubmit} className="card bg-base-100 shadow-sm">
           <div className="card-body space-y-4">
-            <label className="form-control w-full">
-              <span className="label-text mb-1 font-semibold">1人目の希望</span>
-              <textarea
-                className="textarea textarea-bordered w-full"
-                rows={3}
-                value={member1}
-                onChange={(e) => setMember1(e.target.value)}
-                placeholder="例：金欠なので安めがいい。麺類以外。"
-              />
-            </label>
+            {/* 参加者の自由文入力（増減式） */}
+            <div className="space-y-3">
+              <span className="label-text font-semibold">参加者の希望</span>
+              {members.map((text, index) => (
+                // 入力欄は並び順で識別するためindexをkeyに用いる。
+                // biome-ignore lint/suspicious/noArrayIndexKey: 動的な入力行のため
+                <div key={index} className="flex items-start gap-2">
+                  <textarea
+                    className="textarea textarea-bordered w-full"
+                    rows={2}
+                    value={text}
+                    onChange={(e) => updateMember(index, e.target.value)}
+                    placeholder={`${index + 1}人目の希望（例：安めがいい。麺類以外。）`}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => removeMember(index)}
+                    disabled={members.length <= 1}
+                    aria-label={`${index + 1}人目を削除`}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={addMember}
+              >
+                ＋ 参加者を追加
+              </button>
+            </div>
 
-            <label className="form-control w-full">
-              <span className="label-text mb-1 font-semibold">2人目の希望</span>
-              <textarea
-                className="textarea textarea-bordered w-full"
-                rows={3}
-                value={member2}
-                onChange={(e) => setMember2(e.target.value)}
-                placeholder="例：静かに話せる店がいい。"
-              />
-            </label>
+            <div className="divider my-0" />
+
+            {/* 現在地取得 */}
+            <div className="space-y-2">
+              <span className="label-text font-semibold">現在地</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={handleGetLocation}
+                  disabled={geo.kind === "loading"}
+                >
+                  {geo.kind === "loading" && (
+                    <span className="loading loading-spinner loading-xs" />
+                  )}
+                  現在地を取得
+                </button>
+                <span className="text-sm opacity-70">
+                  {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+                  {geo.kind === "success" && "（取得済み）"}
+                  {geo.kind === "idle" && "（東京駅・既定）"}
+                </span>
+              </div>
+              {geo.kind === "error" && (
+                <p className="text-sm text-error">{geo.message}</p>
+              )}
+            </div>
+
+            {/* 検索範囲選択 */}
+            <div className="space-y-2">
+              <span className="label-text font-semibold">検索範囲</span>
+              <div className="join">
+                {RANGE_OPTIONS.map((option) => (
+                  <button
+                    key={option.code}
+                    type="button"
+                    className={`btn join-item btn-sm ${
+                      range === option.code ? "btn-primary" : "btn-outline"
+                    }`}
+                    onClick={() => setRange(option.code)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <button
               type="submit"
@@ -128,13 +266,20 @@ export default function HomePage() {
         </form>
 
         <StatusArea loading={loading} status={status} />
+
+        {result && (
+          <>
+            <ConditionsCard conditions={result.conditions} />
+            <ShopList shops={result.shops} />
+          </>
+        )}
       </main>
     </div>
   );
 }
 
 /**
- * API通信結果・エラーの表示領域。
+ * API通信中・エラー・入力エラーの表示領域。
  *
  * @param {{ loading: boolean, status: any }} props
  */
@@ -150,17 +295,6 @@ function StatusArea({ loading, status }) {
 
   if (!status) {
     return null;
-  }
-
-  if (status.kind === "notImplemented") {
-    return (
-      <div className="alert alert-warning">
-        <div className="flex flex-col items-start gap-2">
-          <span className="badge badge-outline">未実装</span>
-          <span>{status.message}</span>
-        </div>
-      </div>
-    );
   }
 
   if (status.kind === "validation") {
