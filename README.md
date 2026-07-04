@@ -6,6 +6,9 @@
 このリポジトリは **初期環境構築の段階** です。フロントエンド・バックエンドの通信基盤と
 バリデーション・エラーハンドリング・Lint/Format 環境を整えています。
 
+> 📖 開発を始める前に [**開発ルール（CONTRIBUTING.md）**](./CONTRIBUTING.md) を読んでください。
+> Issueの切り方・ブランチ命名規則・PRの流れをまとめています。
+
 ## 実装済みの範囲
 
 - フロントエンド（React + Vite + Tailwind CSS v4 + DaisyUI + React Router）の初期構築
