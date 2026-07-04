@@ -98,8 +98,11 @@ export default function HomePage() {
   /** 画面下部の状態表示。kind: "validation" | "error" | null。 */
   const [status, setStatus] = useState(null);
 
-  // 結果は常にサンプルで初期化しておき、API成功時に実データへ差し替える。
-  const [result, setResult] = useState(SAMPLE_RESULT);
+  // 結果は検索前は非表示（null）。「お店を探す」押下後に表示する。
+  const [result, setResult] = useState(null);
+
+  // 表示中の画面。"input"（入力）→ 検索 →"result"（結果）へ遷移する。
+  const [view, setView] = useState("input");
 
   const selectedRangeLabel =
     RANGE_OPTIONS.find((option) => option.code === range)?.label ?? "";
@@ -117,6 +120,12 @@ export default function HomePage() {
     setMembers((prev) =>
       prev.length <= 1 ? prev : prev.filter((_, i) => i !== index),
     );
+  }
+
+  // 結果画面から入力画面へ戻る。入力内容はstateに残るので保持される。
+  function handleBackToInput() {
+    setView("input");
+    setStatus(null);
   }
 
   function handleGetLocation() {
@@ -185,6 +194,7 @@ export default function HomePage() {
           conditions: data.conditions,
           shops: Array.isArray(data.shops) ? data.shops : [],
         });
+        setView("result");
       } else if (httpStatus === 400) {
         setStatus({
           kind: "validation",
@@ -208,6 +218,9 @@ export default function HomePage() {
         });
       }
     } catch {
+      // バックエンド未接続でもモック2枚目を確認できるよう、サンプル結果を表示する。
+      setResult(SAMPLE_RESULT);
+      setView("result");
       setStatus({
         kind: "error",
         message:
@@ -222,14 +235,15 @@ export default function HomePage() {
     <div className="min-h-screen bg-base-200 text-base-content">
       <SiteHeader />
 
-      <main className="mx-auto w-full max-w-md px-4 pb-12 pt-4 lg:max-w-6xl lg:px-8 lg:pt-8">
-        {/* モバイルは縦積み、デスクトップは「入力（左）／結果（右）」の2カラム。 */}
-        <div className="lg:grid lg:grid-cols-[minmax(340px,380px)_1fr] lg:items-start lg:gap-8">
-          {/* ── 入力パネル（左） ── */}
-          <div className="space-y-4 lg:sticky lg:top-24">
+      <main className="mx-auto w-full max-w-md px-4 pb-12 pt-4 lg:max-w-2xl lg:px-8 lg:pt-8">
+        {/* 入力画面 → 検索 → 結果画面、と全サイズで画面を切り替える。 */}
+        {view === "input" ? (
+          <div className="space-y-4">
             <SectionLabel icon={<PencilIcon className="h-4 w-4" />}>
               みんなの希望を入力
             </SectionLabel>
+
+            {status && <StatusArea status={status} />}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="card bg-base-100 shadow-sm">
@@ -371,12 +385,19 @@ export default function HomePage() {
               </button>
             </form>
           </div>
+        ) : (
+          <div className="space-y-4">
+            {/* 結果画面。上部の「条件を変更する」で入力画面へ戻れる。 */}
+            <button
+              type="button"
+              onClick={handleBackToInput}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-base-content/70 transition hover:text-base-content"
+            >
+              <span aria-hidden>←</span> 条件を変更する
+            </button>
 
-          {/* ── 結果パネル（右） ── */}
-          <div className="mt-4 space-y-4 lg:mt-0">
             {status && <StatusArea status={status} />}
 
-            {/* 結果：みんなの希望まとめ＋AIコメント＋店舗候補 */}
             {result && (
               <>
                 <ConditionsCard conditions={result.conditions} />
@@ -386,14 +407,14 @@ export default function HomePage() {
                   areaLabel={result.areaLabel}
                   rangeLabel={selectedRangeLabel}
                 />
+
+                <p className="pt-1 text-center text-xs text-base-content/50 lg:text-left">
+                  ※表示されている距離は直線距離です。実際の徒歩時間とは異なる場合があります。
+                </p>
               </>
             )}
-
-            <p className="pt-1 text-center text-xs text-base-content/50 lg:text-left">
-              ※表示されている距離は直線距離です。実際の徒歩時間とは異なる場合があります。
-            </p>
           </div>
-        </div>
+        )}
       </main>
     </div>
   );
@@ -402,8 +423,9 @@ export default function HomePage() {
 /** サイト共通ヘッダー。デスクトップはナビ＋履歴ボタン、モバイルはメニューを表示。 */
 function SiteHeader() {
   return (
-    <header className="sticky top-0 z-20 border-b border-base-300 bg-base-100/95 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-md items-center justify-between px-4 py-3 lg:max-w-6xl lg:px-8">
+    <>
+      <header className="fixed inset-x-0 top-0 z-30 border-b border-base-300 bg-base-100/95 backdrop-blur">
+        <div className="mx-auto flex h-16 w-full max-w-md items-center justify-between px-4 lg:max-w-6xl lg:px-8">
         <div className="flex items-center gap-2 lg:gap-3">
           <PeopleIcon className="h-6 w-6 text-accent lg:h-7 lg:w-7" />
           <span className="text-lg font-bold lg:text-xl">
@@ -437,8 +459,11 @@ function SiteHeader() {
         >
           <MenuIcon className="h-5 w-5" />
         </button>
-      </div>
-    </header>
+        </div>
+      </header>
+      {/* fixedヘッダーの高さ分だけ本文を押し下げるスペーサー */}
+      <div className="h-16" aria-hidden />
+    </>
   );
 }
 
