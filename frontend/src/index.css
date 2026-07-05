@@ -4,6 +4,16 @@
   themes: light --default;
 }
 
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  a[href],
+  label[for],
+  select {
+    cursor: pointer;
+  }
+}
+
 :root[data-theme="light"] {
   --color-primary: #12897a; /* ティール：現在地・選択中・詳細リンクなど */
   --color-primary-content: #ffffff;
