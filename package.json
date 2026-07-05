@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "dev": "concurrently -n backend,frontend -c blue,magenta \"npm run dev -w backend\" \"npm run dev -w frontend\"",
-    "build": "npm run build -w frontend",
+    "build": "npm run build -w frontend && npm run build -w backend",
     "check": "biome check --write .",
     "lint": "biome lint .",
     "format": "biome format --write .",

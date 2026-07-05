@@ -1,5 +1,5 @@
 import { Link, NavLink } from "react-router-dom";
-import { HistoryIcon, MenuIcon, PeopleIcon } from "./icons.jsx";
+import { MenuIcon, PeopleIcon } from "./icons.jsx";
 
 /** ヘッダーのナビ項目。デスクトップのナビとモバイルのメニューで共有する。 */
 const NAV_ITEMS = [
@@ -8,16 +8,20 @@ const NAV_ITEMS = [
   { to: "/faq", label: "よくある質問" },
 ];
 
-export default function SiteHeader() {
+export default function SiteHeader({ onLogoClick }) {
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-30 border-b border-base-300 bg-base-100/95 backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-md items-center justify-between px-4 lg:max-w-6xl lg:px-8">
           <div className="flex items-center gap-2 lg:gap-3">
-            <Link to="/" className="flex items-center gap-2 lg:gap-3">
+            <Link
+              to="/"
+              onClick={onLogoClick}
+              className="flex items-center gap-2 lg:gap-3"
+            >
               <PeopleIcon className="h-6 w-6 text-accent lg:h-7 lg:w-7" />
               <span className="text-lg font-bold lg:text-xl">
-                みんなで決めるお店
+                みんなのごはん
               </span>
             </Link>
             <nav className="ml-4 hidden items-center gap-5 text-sm text-base-content/70 lg:flex">
@@ -36,15 +40,6 @@ export default function SiteHeader() {
               ))}
             </nav>
           </div>
-
-          {/* デスクトップ：履歴ボタン */}
-          <button
-            type="button"
-            className="hidden items-center gap-1.5 rounded-lg border border-base-300 px-3 py-1.5 text-sm font-medium transition hover:bg-base-200 lg:inline-flex"
-          >
-            <HistoryIcon className="h-4 w-4" />
-            履歴を見る
-          </button>
 
           {/* モバイル：ドロップダウンメニュー */}
           <div className="dropdown dropdown-end lg:hidden">
@@ -70,12 +65,6 @@ export default function SiteHeader() {
                   </NavLink>
                 </li>
               ))}
-              <li>
-                <button type="button" className="rounded-xl font-medium">
-                  <HistoryIcon className="h-4 w-4" />
-                  履歴を見る
-                </button>
-              </li>
             </ul>
           </div>
         </div>

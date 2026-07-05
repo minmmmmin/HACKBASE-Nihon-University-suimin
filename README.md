@@ -1,10 +1,10 @@
-# suimin — みんなで決めるお店
+# suimin — みんなのごはん
 
 複数人が「今日何を食べたいか」を自由文で入力すると、生成AI（Gemini API）が希望条件を整理し、
-ホットペッパーグルメAPIから取得した店舗候補の中から、グループ全員が納得しやすいお店を3件提案するWebアプリです。
+ホットペッパーグルメAPIから取得した店舗候補の中から、グループ全員が納得しやすいお店を最大30件提案するWebアプリです。
 
-このリポジトリは **初期環境構築の段階** です。フロントエンド・バックエンドの通信基盤と
-バリデーション・エラーハンドリング・Lint/Format 環境を整えています。
+このリポジトリは **プロトタイプ実装の段階** です。フロントエンド・バックエンドの通信基盤に加えて、
+Gemini API による希望条件の整理と HotPepper Gourmet API による店舗候補取得を接続しています。
 
 > 📖 開発を始める前に [**開発ルール（CONTRIBUTING.md）**](./CONTRIBUTING.md) を読んでください。
 > Issueの切り方・ブランチ命名規則・PRの流れをまとめています。
@@ -15,34 +15,34 @@
 - バックエンド（Node.js + Express + Zod + CORS + dotenv）の初期構築
 - フロントエンド → バックエンドの `POST /api/recommend` 通信（`fetch`）
 - Zod によるリクエストバリデーション
-- 共通エラーハンドリング（400 / 404 / 500 / 501）
+- 共通エラーハンドリング（400 / 404 / 500）
 - Biome による Lint・フォーマット・import 整理
 - DaisyUI による最低限のトップページ
-- Gemini API / ホットペッパーAPI 実装用ファイルの雛形
+- Gemini API による自由文の条件整理
+- ホットペッパーグルメAPI による店舗候補取得
+- AI条件に基づく店舗スコアリングと最大30件の返却
+- 1台入力モードと、ルームを作って複数端末から希望を集めるモード
 
 ## 未実装の範囲
 
-- Gemini API との本接続
-- ホットペッパーグルメAPI との本接続
-- 店舗推薦ロジック
-- 店舗データ・AI解析結果・推薦結果のモック（意図的に返しません）
 - データベース
 - MCP
 
-現時点で `POST /api/recommend` は、バリデーション成功後に **HTTP 501（Not Implemented）** を返します。
-これは Gemini API とホットペッパーAPI を未接続にしているためで、モックデータを返さない方針です。
+`POST /api/recommend` とルームの検索実行では、毎回 Gemini API と HotPepper Gourmet API を呼び出します。
+`GEMINI_API_KEY` / `HOTPEPPER_API_KEY` が未設定、または外部API呼び出しに失敗した場合は、
+固定データにフォールバックせずエラーを返します。
 
 ## 技術スタック
 
 | 区分 | 技術 |
 | --- | --- |
 | フロントエンド | React 19, JavaScript, Vite 6, Tailwind CSS v4, DaisyUI 5, React Router 7, fetch |
-| バックエンド | Node.js, JavaScript (ES Modules), Express 4, Zod, CORS, dotenv |
+| バックエンド | Node.js, TypeScript (ES Modules), Express 4, Zod, CORS, dotenv |
 | 品質管理 | Biome（Lint / Format / organize imports） |
-| 今後の外部サービス | Gemini API（Google AI Studio）, HotPepper Gourmet API |
+| 外部サービス | Gemini API（Google AI Studio）, HotPepper Gourmet API |
 | デプロイ想定 | バックエンド: Render / フロントエンド: Vercel または Render Static Site |
 
-TypeScript は使用していません（`.js` / `.jsx` のみ）。
+バックエンドは TypeScript、フロントエンドは JavaScript / JSX です。
 
 ## 必要な Node.js バージョン
 
@@ -81,11 +81,13 @@ cp frontend/.env.example frontend/.env
 PORT=3000
 FRONTEND_ORIGIN=http://localhost:5173
 GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.5-flash
 HOTPEPPER_API_KEY=
 ```
 
 - `FRONTEND_ORIGIN`: CORS の許可元。
-- `GEMINI_API_KEY` / `HOTPEPPER_API_KEY`: 今後の実装で使用（現時点では未使用）。
+- `GEMINI_API_KEY` / `HOTPEPPER_API_KEY`: Gemini API と HotPepper Gourmet API の接続で使用します。どちらも必須です。
+- `GEMINI_MODEL`: Gemini のモデル名。未設定時は `gemini-3.5-flash` を使います。
 - **API キーはフロントエンドには置きません。**
 
 ### フロントエンド（`frontend/.env`）
@@ -115,8 +117,7 @@ npm run dev
 npm run build
 ```
 
-- Vite によるフロントエンドの本番ビルドのみ実行します（出力: `frontend/dist`）。
-- バックエンドは JavaScript のためビルド不要です。
+- ルートの `npm run build` はフロントエンド（`frontend/dist`）とバックエンド（`backend/dist`）をビルドします。
 
 ## Biome（Lint / Format）
 
@@ -136,13 +137,25 @@ project-root/
 ├── frontend/
 │   ├── src/
 │   │   ├── api/
-│   │   │   └── recommend.js      # fetch による API 通信
-│   │   ├── components/           # （今後追加用）
+│   │   │   ├── recommend.js      # 店舗推薦 API 通信
+│   │   │   ├── rooms.js          # ルーム作成・参加・結果取得
+│   │   │   └── areas.js          # エリアマスタ取得
+│   │   ├── components/
+│   │   │   ├── SiteHeader.jsx    # 共通ヘッダー
+│   │   │   ├── ShopList.jsx      # 店舗一覧
+│   │   │   ├── ConditionsCard.jsx# AI整理した希望条件の表示
+│   │   │   ├── AiComment.jsx     # AIコメント表示
+│   │   │   ├── RoomResultView.jsx# ルームの検索結果表示
+│   │   │   └── icons.jsx         # アイコン群
 │   │   ├── pages/
-│   │   │   └── HomePage.jsx      # トップページ
+│   │   │   ├── HomePage.jsx      # トップページ（1台入力）
+│   │   │   ├── HowToUsePage.jsx  # 使い方
+│   │   │   ├── FaqPage.jsx       # よくある質問
+│   │   │   ├── RoomHostPage.jsx  # ルーム主催（QR共有・検索実行）
+│   │   │   └── RoomJoinPage.jsx  # ルーム参加（希望入力）
 │   │   ├── App.jsx               # ルーティング定義
 │   │   ├── main.jsx              # エントリポイント
-│   │   └── index.css             # Tailwind + DaisyUI 読み込み
+│   │   └── index.css             # Tailwind + DaisyUI 読み込み・テーマ定義
 │   ├── .env.example
 │   ├── index.html
 │   ├── package.json
@@ -150,18 +163,18 @@ project-root/
 │
 ├── backend/
 │   ├── src/
-│   │   ├── middleware/
-│   │   │   └── error-handler.js  # 404 / 共通エラーハンドラー
 │   │   ├── routes/
-│   │   │   ├── health.js         # GET /api/health
-│   │   │   └── recommend.js      # POST /api/recommend
+│   │   │   ├── recommend.ts      # POST /api/recommend
+│   │   │   ├── rooms.ts          # ルーム作成・参加・結果取得
+│   │   │   └── areas.ts          # HotPepper エリアマスタ取得
 │   │   ├── schemas/
-│   │   │   └── recommend.js      # Zod スキーマ
+│   │   │   └── recommend.ts      # Zod スキーマ
 │   │   ├── services/
-│   │   │   ├── gemini.js         # Gemini API 実装予定（雛形）
-│   │   │   └── hotpepper.js      # HotPepper API 実装予定（雛形）
-│   │   ├── app.js                # Express アプリ設定
-│   │   └── server.js             # サーバー起動
+│   │   │   ├── areas.ts          # HotPepper エリアマスタAPI 接続
+│   │   │   ├── gemini.ts         # Gemini API 接続
+│   │   │   └── hotpepper.ts      # HotPepper API 接続
+│   │   ├── app.ts                # Express アプリ設定
+│   │   └── index.ts              # サーバー起動
 │   ├── .env.example
 │   └── package.json
 │
@@ -175,7 +188,7 @@ project-root/
 
 ベースパス: バックエンドの `/api`
 
-### `GET /api/health`
+### `GET /health`
 
 ヘルスチェック。
 
@@ -201,18 +214,41 @@ project-root/
 }
 ```
 
-**現時点の挙動:** バリデーション成功後は `501 Not Implemented` を返します。
+レスポンス:
 
 ```json
 {
-  "error": "Not Implemented",
-  "message": "店舗推薦機能はまだ実装されていません"
+  "conditions": {
+    "budgetLevel": "low",
+    "excludedGenres": ["ラーメン"],
+    "preferredGenres": ["和食"],
+    "preferredAtmosphere": ["静か", "駅近"],
+    "maxWalkingMinutes": 5,
+    "summary": "予算は安めで、静かに話せる駅近のお店が合いそうです。"
+  },
+  "summary": "予算は安めで、静かに話せる駅近のお店が合いそうです。",
+  "shops": [
+    {
+      "id": "J001234567",
+      "name": "和ごはん かえで",
+      "genre": "和食",
+      "budget": "3000円",
+      "access": "駅から徒歩3分（直線約250m）",
+      "reason": "和食として静か・駅近の希望に合いやすい候補です。",
+      "distanceMeters": 250,
+      "matchScore": 92,
+      "iconType": "bowl",
+      "url": "https://www.hotpepper.jp/..."
+    }
+  ],
+  "areaLabel": "現在地周辺",
+  "range": 3
 }
 ```
 
 #### バリデーション仕様（Zod）
 
-- `location` は必須。`location.lat` / `location.lng` は number。
+- `location` または `areaCode` のどちらかは必須。`location.lat` / `location.lng` は number。
 - `lat` は -90〜90、`lng` は -180〜180。
 - `members` は1人以上の配列。`members[].text` は1〜500文字。空白のみは無効（trim後に判定）。
 
@@ -236,11 +272,7 @@ project-root/
 
 ## 今後の実装予定箇所
 
-- **Gemini API**: `backend/src/services/gemini.js` の `parseGroupPreferences()`
-  自由文を検索条件（予算・除外ジャンル・希望ジャンル・雰囲気・徒歩分数など）へ構造化します。
-- **HotPepper API**: `backend/src/services/hotpepper.js` の `searchShops()`
-  位置情報と条件から店舗候補を取得します。
-- 上記2つを `backend/src/routes/recommend.js` の 501 箇所で接続し、推薦結果を返す予定です。
+- **永続化**: 現在のルーム情報はメモリストアです。再起動で消えるため、必要に応じてDBへ置き換えます。
 
 ## UI（Tailwind CSS / DaisyUI）
 
@@ -251,11 +283,11 @@ project-root/
 ```css
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: cupcake --default;
+  themes: light --default;
 }
 ```
 
-- 使用テーマ: **cupcake**（`frontend/index.html` の `<html data-theme="cupcake">`）
+- 使用テーマ: **light** をベースに、`frontend/src/index.css` の `:root[data-theme="light"]` でブランドカラー（ティール `#12897a` / オレンジ `#f2921e` / クリーム背景 `#fbf6ec`）を上書きしています（`frontend/index.html` の `<html data-theme="light">`）。
 - ダークモード切り替えは実装していません。
 - 使用 DaisyUI コンポーネント: `navbar` / `card` / `textarea` / `input` / `button` / `alert` / `loading` / `badge`
 
@@ -267,7 +299,7 @@ project-root/
 
 ```text
 Root Directory: backend
-Build Command:  npm install
+Build Command:  npm install && npm run build
 Start Command:  npm run start
 ```
 
@@ -275,7 +307,7 @@ Start Command:  npm run start
 
 ```text
 Root Directory: （ルートのまま）
-Build Command:  npm install
+Build Command:  npm install && npm run build -w backend
 Start Command:  npm run start -w backend
 ```
 
