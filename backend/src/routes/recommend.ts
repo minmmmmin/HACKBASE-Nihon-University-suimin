@@ -24,7 +24,8 @@ router.post("/", async (req, res, _next) => {
     "\n\nというリクエストが来ています。" +
     "この要望をまとめてホットペッパーのAPIに投げたいです。\n" + 
     "以下の形式に従ってURLのパラメータ部分のみを出力してください。\n" +
-    "省略するパラメータについては出力しないでください。\n" +
+    "省略するパラメータについては出力しないでください。完全にパラメータがなくなった場合は&keyword=とだけ出力してください。\n" +
+    "余計な日本語は出力しないでください。\n" +
     "&keyword=他のパラメータに入れられない要件全般(なんでも良いみたいなのは入れないこと、省略可)" + 
     "&genre=居酒屋ならG001, 和食ならG004, 洋食ならG005, イタリアンやフレンチならG006, 中華ならG007, 該当しないなら省略、複数欲しいならIDでなく単語でkeywordに" +
     "&free_drink=飲み放題が必要なら1、不要なら省略" +
@@ -84,30 +85,10 @@ router.post("/", async (req, res, _next) => {
     "これらのうちユーザーのリクエストに適応すると思うものをオススメ順に出力してください。\n" +
     "なお、現在地はlat: " + obj.location.lat + ", lng: " + obj.location.lng + "です。\n" +
     "出力は以下の形式でjsonにしてください。コードブロックなどにも入れずにテキストのみを出力してください。\n" +
-    '{ conditions: {budgetLevel: "low, medium, high, anyのいずれか", excludedGenres: ["除外するジャンル1", "除外するジャンル2(個数は任せます)"], preferredGenres: ["選択したいジャンル1", "選択したいジャンル2(個数は任せます)"], preferredAtmosphere: ["雰囲気1", "雰囲気2(個数は任せます)"], maxWalkingMinutes: number | null}, shops:[{id: "店1ID", name: "店1名前", genre: "店1ジャンル", budget: "店1予算", access: "店1予算", reason: "あなたが店1を選んだ理由(50文字程度)", distanceMeters: number /* 店1の現在地からの距離(メートル) */, imageUrl: "店1の画像URL(ホットペッパーの結果に入ってるはず)"} ] }'
+    '{ summary: "店全体の選定理由(100文字程度)", areaLabel: "指定された場所が大体どんなエリアか(渋谷周辺など、latとlngから推定してください)", conditions: {budgetLevel: "low, medium, high, anyのいずれか", excludedGenres: ["除外するジャンル1", "除外するジャンル2(個数は任せます)"], preferredGenres: ["選択したいジャンル1", "選択したいジャンル2(個数は任せます)"], preferredAtmosphere: ["雰囲気1", "雰囲気2(個数は任せます)"], maxWalkingMinutes: number | null}, shops:[{id: "店1ID", name: "店1名前", genre: "店1ジャンル", budget: "店1予算", access: "店1予算", reason: "あなたが店1を選んだ理由(50文字程度)", distanceMeters: number /* 店1の現在地からの距離(メートル) */, matchScore: number /*あなたが算出した店1のマッチ度(0~100)*/, iconType: "bowl, coffee, utensilsのいずれか" ] }'
   );
+  console.log(geminiReply2);
 
-
-  // const result = {
-  //   conditions: {
-  //     budgetLevel: "any",
-  //     excludedGenres: ["居酒屋"],
-  //     preferredGenres: ["イタリアン"],
-  //     preferredAtmosphere: ["静か"],
-  //     maxWalkingMinutes: 10
-  //   },
-  //   shops: [
-  //     {
-  //       id: "shop_001",
-  //       name: "イタリアンレストラン英",
-  //       budget: "~1000円",
-  //       access: "新宿駅から徒歩5分",
-  //       reason: geminiReply1,
-  //       distanceMeters: 420,
-  //       imageUrl: "https://example.com/shop.jpg"
-  //     }
-  //   ]
-  // };
   const result = JSON.parse(geminiReply2!);
   // console.log("AI says" + geminiReply1);
   res.status(200).send(result);
