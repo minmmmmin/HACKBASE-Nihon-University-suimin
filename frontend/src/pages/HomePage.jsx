@@ -24,12 +24,13 @@ const MEMBER_MAX_LENGTH = 200;
 // 現在地が取得できない場合のフォールバック座標（東京駅付近）。
 const DEFAULT_LOCATION = { lat: 35.658, lng: 139.701 };
 
-// 検索範囲プリセット。codeはホットペッパー準拠（1=300m … 4=2000m）。
+// 検索範囲プリセット。codeはホットペッパー準拠（1=300m … 5=3000m）。
 const RANGE_OPTIONS = [
   { code: 1, label: "300m" },
   { code: 2, label: "500m" },
   { code: 3, label: "1km" },
   { code: 4, label: "2km" },
+  { code: 5, label: "3km" },
 ];
 
 export default function HomePage() {
@@ -419,8 +420,11 @@ export default function HomePage() {
                               現在地を取得しました
                             </p>
                             <p className="text-xs text-base-content/60">
-                              {location.lat.toFixed(4)},{" "}
-                              {location.lng.toFixed(4)} 付近
+                              現在地周辺（
+                              {RANGE_OPTIONS.find(
+                                (option) => option.code === range,
+                              )?.label ?? "1km"}
+                              以内）で探します
                             </p>
                           </div>
                         </div>
@@ -495,14 +499,14 @@ export default function HomePage() {
                       検索範囲
                     </SectionTitle>
 
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-5 gap-2">
                       {RANGE_OPTIONS.map((option) => {
                         const active = range === option.code;
                         return (
                           <button
                             key={option.code}
                             type="button"
-                            className={`rounded-xl py-2 text-sm font-semibold transition ${
+                            className={`min-h-10 rounded-xl px-1 py-2 text-sm font-semibold transition ${
                               active
                                 ? "bg-primary text-primary-content shadow-sm"
                                 : "bg-base-200 text-base-content/70 hover:bg-base-300"
