@@ -117,7 +117,7 @@ async function fetchHotPepperShops(
   const url = new URL("https://webservice.recruit.co.jp/hotpepper/gourmet/v1/");
   url.searchParams.set("key", apiKey);
   url.searchParams.set("format", "json");
-  url.searchParams.set("count", "30");
+  url.searchParams.set("count", "100");
   url.searchParams.set("order", "4");
 
   if (keyword) {
