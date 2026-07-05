@@ -113,6 +113,19 @@ export default function HomePage() {
   function isAreaSelectionMissing() {
     return locationMode === "area" && !middleAreaCode;
   }
+  function isLocationMissing() {
+    if (locationMode === "area") {
+      return !middleAreaCode;
+    }
+    return geo.kind === "idle";
+  }
+
+  // 位置未指定のときに表示する案内メッセージ。
+  function locationMissingMessage() {
+    return locationMode === "area"
+      ? "エリアを選択してください。"
+      : "「現在地から探す」を押して現在地を取得してください。";
+  }
 
   function isAreaValidationStatus() {
     return (
@@ -125,6 +138,17 @@ export default function HomePage() {
     if (isAreaValidationStatus()) {
       setStatus(null);
     }
+  }
+
+  // 位置未指定の案内（現在地・エリアどちらの文言でも）を消す。
+  function clearLocationValidationStatus() {
+    setStatus((prev) =>
+      prev?.kind === "validation" &&
+      (prev.message === "エリアを選択してください。" ||
+        prev.message === "「現在地から探す」を押して現在地を取得してください。")
+        ? null
+        : prev,
+    );
   }
 
   function updateMember(index, value) {
@@ -180,6 +204,8 @@ export default function HomePage() {
           lng: position.coords.longitude,
         });
         setGeo({ kind: "success" });
+        // 位置未指定の案内を出していたら消す。
+        clearLocationValidationStatus();
       },
       (error) => {
         const message =
@@ -210,10 +236,10 @@ export default function HomePage() {
       return;
     }
 
-    if (isAreaSelectionMissing()) {
+    if (isLocationMissing()) {
       setStatus({
         kind: "validation",
-        message: "エリアを選択してください。",
+        message: locationMissingMessage(),
         details: [],
       });
       return;
@@ -276,10 +302,10 @@ export default function HomePage() {
 
   // group モード：部屋を作成し、幹事の待機画面へ遷移する。
   async function handleCreateRoom() {
-    if (isAreaSelectionMissing()) {
+    if (isLocationMissing()) {
       setStatus({
         kind: "validation",
-        message: "エリアを選択してください。",
+        message: locationMissingMessage(),
         details: [],
       });
       return;
@@ -415,9 +441,8 @@ export default function HomePage() {
                           type="button"
                           onClick={() => {
                             setLocationMode(option.value);
-                            if (option.value === "current") {
-                              clearAreaValidationStatus();
-                            }
+                            // モードを切り替えたら位置未指定の案内は一旦消す。
+                            clearLocationValidationStatus();
                           }}
                           className={`rounded-lg py-2 text-sm font-semibold transition ${
                             active
@@ -566,7 +591,7 @@ export default function HomePage() {
                 <button
                   type="submit"
                   className="btn btn-accent w-full gap-2 rounded-xl text-base shadow-md"
-                  disabled={loading}
+                  disabled={loading || isLocationMissing()}
                 >
                   {loading ? (
                     <span className="loading loading-spinner loading-sm" />
@@ -580,7 +605,7 @@ export default function HomePage() {
                   type="button"
                   onClick={handleCreateRoom}
                   className="btn btn-accent w-full gap-2 rounded-xl text-base shadow-md"
-                  disabled={creating}
+                  disabled={creating || isLocationMissing()}
                 >
                   {creating ? (
                     <span className="loading loading-spinner loading-sm" />
