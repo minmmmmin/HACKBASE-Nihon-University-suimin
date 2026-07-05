@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import QRCode from "qrcode";
 import { useNavigate, useParams } from "react-router-dom";
 import { getResult, getRoom, runRecommend } from "../api/rooms.js";
 import {
@@ -32,9 +33,37 @@ export default function RoomHostPage() {
   const [searching, setSearching] = useState(false);
   const [result, setResult] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
 
   // 参加者が開く招待URL。
   const joinUrl = `${window.location.origin}/room/${roomId}`;
+
+  useEffect(() => {
+    let active = true;
+    QRCode.toDataURL(joinUrl, {
+      errorCorrectionLevel: "M",
+      margin: 2,
+      scale: 8,
+      color: {
+        dark: "#1f2933",
+        light: "#ffffff",
+      },
+    })
+      .then((url) => {
+        if (active) {
+          setQrCodeUrl(url);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setQrCodeUrl("");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [joinUrl]);
 
   const refresh = useCallback(async () => {
     try {
@@ -171,6 +200,36 @@ export default function RoomHostPage() {
                 <p className="text-center text-xs text-base-content/50">
                   「みんなの端末で」からこのコードを入力しても参加できます。
                 </p>
+              </div>
+            </div>
+
+            {/* QRコード */}
+            <div className="card bg-base-100 shadow-sm">
+              <div className="card-body items-center gap-3 p-5">
+                <span className="text-sm font-semibold">招待QRコード</span>
+                <div className="grid h-48 w-48 place-items-center rounded-2xl border border-base-300 bg-white p-3">
+                  {qrCodeUrl ? (
+                    <img
+                      src={qrCodeUrl}
+                      alt="参加リンクのQRコード"
+                      className="h-full w-full"
+                    />
+                  ) : (
+                    <span className="loading loading-spinner loading-md text-primary" />
+                  )}
+                </div>
+                <p className="text-center text-xs text-base-content/50">
+                  参加者はスマホで読み取るだけで希望入力画面を開けます。
+                </p>
+                {qrCodeUrl && (
+                  <a
+                    href={qrCodeUrl}
+                    download={`suimin-room-${roomId}-qr.png`}
+                    className="btn btn-outline btn-sm rounded-xl"
+                  >
+                    画像を保存
+                  </a>
+                )}
               </div>
             </div>
 
