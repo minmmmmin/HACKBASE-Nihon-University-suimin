@@ -21,7 +21,7 @@ export default function SiteHeader({ onLogoClick }) {
             >
               <PeopleIcon className="h-6 w-6 text-accent lg:h-7 lg:w-7" />
               <span className="text-lg font-bold lg:text-xl">
-                みんなで決めるお店
+                みんなのごはん
               </span>
             </Link>
             <nav className="ml-4 hidden items-center gap-5 text-sm text-base-content/70 lg:flex">

@@ -111,7 +111,7 @@ export default function RoomHostPage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "みんなで決めるお店",
+          title: "みんなのごはん",
           text: `お店選びに参加してね（合言葉: ${roomId}）`,
           url: joinUrl,
         });

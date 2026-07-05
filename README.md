@@ -1,4 +1,4 @@
-# suimin — みんなで決めるお店
+# suimin — みんなのごはん
 
 複数人が「今日何を食べたいか」を自由文で入力すると、生成AI（Gemini API）が希望条件を整理し、
 ホットペッパーグルメAPIから取得した店舗候補の中から、グループ全員が納得しやすいお店を最大30件提案するWebアプリです。
@@ -137,13 +137,25 @@ project-root/
 ├── frontend/
 │   ├── src/
 │   │   ├── api/
-│   │   │   └── recommend.js      # fetch による API 通信
-│   │   ├── components/           # （今後追加用）
+│   │   │   ├── recommend.js      # 店舗推薦 API 通信
+│   │   │   ├── rooms.js          # ルーム作成・参加・結果取得
+│   │   │   └── areas.js          # エリアマスタ取得
+│   │   ├── components/
+│   │   │   ├── SiteHeader.jsx    # 共通ヘッダー
+│   │   │   ├── ShopList.jsx      # 店舗一覧
+│   │   │   ├── ConditionsCard.jsx# AI整理した希望条件の表示
+│   │   │   ├── AiComment.jsx     # AIコメント表示
+│   │   │   ├── RoomResultView.jsx# ルームの検索結果表示
+│   │   │   └── icons.jsx         # アイコン群
 │   │   ├── pages/
-│   │   │   └── HomePage.jsx      # トップページ
+│   │   │   ├── HomePage.jsx      # トップページ（1台入力）
+│   │   │   ├── HowToUsePage.jsx  # 使い方
+│   │   │   ├── FaqPage.jsx       # よくある質問
+│   │   │   ├── RoomHostPage.jsx  # ルーム主催（QR共有・検索実行）
+│   │   │   └── RoomJoinPage.jsx  # ルーム参加（希望入力）
 │   │   ├── App.jsx               # ルーティング定義
 │   │   ├── main.jsx              # エントリポイント
-│   │   └── index.css             # Tailwind + DaisyUI 読み込み
+│   │   └── index.css             # Tailwind + DaisyUI 読み込み・テーマ定義
 │   ├── .env.example
 │   ├── index.html
 │   ├── package.json
@@ -271,11 +283,11 @@ project-root/
 ```css
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: cupcake --default;
+  themes: light --default;
 }
 ```
 
-- 使用テーマ: **cupcake**（`frontend/index.html` の `<html data-theme="cupcake">`）
+- 使用テーマ: **light** をベースに、`frontend/src/index.css` の `:root[data-theme="light"]` でブランドカラー（ティール `#12897a` / オレンジ `#f2921e` / クリーム背景 `#fbf6ec`）を上書きしています（`frontend/index.html` の `<html data-theme="light">`）。
 - ダークモード切り替えは実装していません。
 - 使用 DaisyUI コンポーネント: `navbar` / `card` / `textarea` / `input` / `button` / `alert` / `loading` / `badge`
 
