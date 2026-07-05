@@ -190,7 +190,7 @@ function toScoredRecommendation(
       access: formatAccess(shop.access, distanceMeters),
       reason: buildReason(shop, preferences),
       distanceMeters,
-      matchScore: clamp(Math.round(65 + score * 4), 60, 98),
+      matchScore: clamp(Math.round(45 + score * 5), 45, 98),
       iconType: pickIconType(genre),
       url: shop.urls?.pc,
       imageUrl: pickImageUrl(shop),
@@ -238,8 +238,9 @@ function scoreShop(
       score += 2;
     }
   }
-  if (shop.distanceMeters > 0 && shop.distanceMeters <= 500) {
-    score += 1;
+  // 近いほど連続的に加点（0m≒+3, 900mで0）。閾値だと同点だらけになるのを防ぐ。
+  if (shop.distanceMeters > 0) {
+    score += Math.max(0, 3 - shop.distanceMeters / 300);
   }
 
   return score;
