@@ -1,7 +1,9 @@
 import cors from "cors";
 import express from "express";
 
+import areasRouter from "./routes/areas.js";
 import router from "./routes/recommend.js";
+import roomsRouter from "./routes/rooms.js";
 
 const app = express();
 
@@ -16,6 +18,8 @@ app.get("/health", (_req, res) => {
 
 // API
 app.use("/api/recommend", router);
+app.use("/api/rooms", roomsRouter);
+app.use("/api/areas", areasRouter);
 
 // 404
 app.use((_req, res) => {

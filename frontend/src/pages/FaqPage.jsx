@@ -89,9 +89,7 @@ export default function FaqPage() {
       <main className="mx-auto w-full max-w-md px-4 pb-16 pt-6 lg:max-w-3xl lg:px-8 lg:pt-10">
         {/* ── ヒーロー ── */}
         <section className="text-center">
-          <h1 className="mt-3 text-2xl font-bold lg:text-3xl">
-            よくある質問
-          </h1>
+          <h1 className="mt-3 text-2xl font-bold lg:text-3xl">よくある質問</h1>
         </section>
 
         {/* ── カテゴリごとのQ&A ── */}

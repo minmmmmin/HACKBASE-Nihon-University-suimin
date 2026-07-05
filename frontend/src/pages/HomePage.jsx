@@ -1,11 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { getAreas } from "../api/areas.js";
 import { requestRecommendation } from "../api/recommend.js";
+import { createRoom } from "../api/rooms.js";
 import AiComment from "../components/AiComment.jsx";
 import ConditionsCard from "../components/ConditionsCard.jsx";
 import {
+  ArrowRightIcon,
   CheckCircleIcon,
   LocationPinIcon,
   PencilIcon,
+  PeopleIcon,
   PersonIcon,
   SearchIcon,
   TargetIcon,
@@ -85,10 +90,25 @@ const SAMPLE_RESULT = {
 };
 
 export default function HomePage() {
+  const navigate = useNavigate();
+
+  // 入力方法。"solo" = 1台で全員分入力 / "group" = 部屋を作って各自の端末で入力。
+  const [mode, setMode] = useState("solo");
+
   const [members, setMembers] = useState(DEFAULT_MEMBERS);
   const [location, setLocation] = useState(DEFAULT_LOCATION);
   const [range, setRange] = useState(3);
   const [loading, setLoading] = useState(false);
+
+  // 位置の指定方法。"current" = 現在地 / "area" = エリアを選ぶ。
+  const [locationMode, setLocationMode] = useState("current");
+  // エリア一覧（初回に取得）と、選択中の大エリア・中エリア。
+  const [areas, setAreas] = useState({ largeAreas: [], middleAreas: [] });
+  const [largeAreaCode, setLargeAreaCode] = useState("");
+  const [middleAreaCode, setMiddleAreaCode] = useState("");
+
+  // 部屋作成中フラグ（group モードの「部屋を作る」用）。
+  const [creating, setCreating] = useState(false);
 
   /** 現在地取得の状態: { kind: "idle" | "loading" | "success" | "error", message?: string } */
   const [geo, setGeo] = useState({ kind: "idle" });
@@ -102,8 +122,34 @@ export default function HomePage() {
   // 表示中の画面。"input"（入力）→ 検索 →"result"（結果）へ遷移する。
   const [view, setView] = useState("input");
 
-  const selectedRangeLabel =
-    RANGE_OPTIONS.find((option) => option.code === range)?.label ?? "";
+  // エリア一覧を初回に取得する（失敗しても現在地モードは使える）。
+  useEffect(() => {
+    getAreas().then(({ ok, data }) => {
+      if (ok && data) {
+        setAreas(data);
+      }
+    });
+  }, []);
+
+  // 選択中の大エリアに属する中エリアだけを絞り込む。
+  const middleAreaOptions = areas.middleAreas.filter(
+    (m) => m.largeAreaCode === largeAreaCode,
+  );
+
+  // 送信ペイロードの位置指定部分を組み立てる。
+  // エリアモードは { areaCode, areaName }、現在地モードは { location, range }。
+  function buildLocationPayload() {
+    if (locationMode === "area" && middleAreaCode) {
+      const selected = areas.middleAreas.find((m) => m.code === middleAreaCode);
+      return { areaCode: middleAreaCode, areaName: selected?.name };
+    }
+    return { location, range };
+  }
+
+  // エリアモードなのに中エリア未選択なら true（送信をブロックする）。
+  function isAreaSelectionMissing() {
+    return locationMode === "area" && !middleAreaCode;
+  }
 
   function updateMember(index, value) {
     setMembers((prev) => prev.map((text, i) => (i === index ? value : text)));
@@ -173,10 +219,19 @@ export default function HomePage() {
       return;
     }
 
+    if (isAreaSelectionMissing()) {
+      setStatus({
+        kind: "validation",
+        message: "エリアを選択してください。",
+        details: [],
+      });
+      return;
+    }
+
     setLoading(true);
     setStatus(null);
 
-    const payload = { location, range, members: filledMembers };
+    const payload = { ...buildLocationPayload(), members: filledMembers };
 
     try {
       const {
@@ -187,7 +242,8 @@ export default function HomePage() {
 
       if (ok) {
         setResult({
-          areaLabel: SAMPLE_RESULT.areaLabel,
+          areaLabel: data.areaLabel ?? "現在地周辺",
+          range: data.range ?? null,
           summary: data.summary,
           conditions: data.conditions,
           shops: Array.isArray(data.shops) ? data.shops : [],
@@ -229,6 +285,41 @@ export default function HomePage() {
     }
   }
 
+  // group モード：部屋を作成し、幹事の待機画面へ遷移する。
+  async function handleCreateRoom() {
+    if (isAreaSelectionMissing()) {
+      setStatus({
+        kind: "validation",
+        message: "エリアを選択してください。",
+        details: [],
+      });
+      return;
+    }
+    setCreating(true);
+    setStatus(null);
+    try {
+      const { ok, data } = await createRoom(buildLocationPayload());
+      if (ok && data?.roomId) {
+        // hostToken は幹事本人だけが持つべきなので sessionStorage に保管する。
+        sessionStorage.setItem(`hostToken:${data.roomId}`, data.hostToken);
+        navigate(`/room/${data.roomId}/host`);
+      } else {
+        setStatus({
+          kind: "error",
+          message: "部屋の作成に失敗しました。時間をおいて試してください。",
+        });
+      }
+    } catch {
+      setStatus({
+        kind: "error",
+        message:
+          "サーバーに接続できませんでした。バックエンドが起動しているか確認してください。",
+      });
+    } finally {
+      setCreating(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-base-200 text-base-content">
       <SiteHeader />
@@ -237,62 +328,80 @@ export default function HomePage() {
         {/* 入力画面 → 検索 → 結果画面、と全サイズで画面を切り替える。 */}
         {view === "input" ? (
           <div className="space-y-4">
+            {/* 入力方法の切り替え：1台でまとめて / 部屋を作って各自の端末で。 */}
+            <ModeSwitch mode={mode} onChange={setMode} />
+
             <SectionLabel icon={<PencilIcon className="h-4 w-4" />}>
-              みんなの希望を入力
+              {mode === "solo"
+                ? "みんなの希望を入力"
+                : "エリアを決めて部屋を作る"}
             </SectionLabel>
+
+            {mode === "group" && (
+              <p className="rounded-2xl bg-info/10 px-4 py-3 text-sm text-base-content/70">
+                エリアと検索範囲を決めて部屋を作ると、合言葉やQR相当のリンクで
+                みんなを招待できます。各自が
+                <span className="font-semibold">自分の端末</span>
+                で希望を入力するので、他の人の希望は見えません。
+              </p>
+            )}
 
             {status && <StatusArea status={status} />}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="card bg-base-100 shadow-sm">
-                <div className="card-body gap-4 p-4">
-                  {members.map((text, index) => (
-                    // 入力欄は並び順で識別するためindexをkeyに用いる。
-                    // biome-ignore lint/suspicious/noArrayIndexKey: 動的な入力行のため
-                    <div key={index} className="space-y-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <PersonIcon
-                          className={`h-4 w-4 ${index % 2 === 0 ? "text-primary" : "text-accent"}`}
-                        />
-                        <span className="text-sm font-semibold">
-                          {index + 1}人目
-                        </span>
-                        {members.length > 1 && (
-                          <button
-                            type="button"
-                            className="ml-auto text-xs text-base-content/40 transition hover:text-error"
-                            onClick={() => removeMember(index)}
-                            aria-label={`${index + 1}人目を削除`}
-                          >
-                            削除
-                          </button>
-                        )}
+              {mode === "solo" && (
+                <div className="card bg-base-100 shadow-sm">
+                  <div className="card-body gap-4 p-4">
+                    {members.map((text, index) => (
+                      // 入力欄は並び順で識別するためindexをkeyに用いる。
+                      // biome-ignore lint/suspicious/noArrayIndexKey: 動的な入力行のため
+                      <div key={index} className="space-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <PersonIcon
+                            className={`h-4 w-4 ${index % 2 === 0 ? "text-primary" : "text-accent"}`}
+                          />
+                          <span className="text-sm font-semibold">
+                            {index + 1}人目
+                          </span>
+                          {members.length > 1 && (
+                            <button
+                              type="button"
+                              className="ml-auto text-xs text-base-content/40 transition hover:text-error"
+                              onClick={() => removeMember(index)}
+                              aria-label={`${index + 1}人目を削除`}
+                            >
+                              削除
+                            </button>
+                          )}
+                        </div>
+                        <div className="relative">
+                          <textarea
+                            className="textarea textarea-bordered w-full resize-none rounded-xl bg-base-100 pb-6 leading-relaxed"
+                            rows={3}
+                            maxLength={MEMBER_MAX_LENGTH}
+                            value={text}
+                            onChange={(e) =>
+                              updateMember(index, e.target.value)
+                            }
+                            placeholder={`${index + 1}人目の希望（例：安めがいい。麺類以外。）`}
+                          />
+                          <span className="pointer-events-none absolute bottom-2 right-3 text-xs text-base-content/40">
+                            {text.length}/{MEMBER_MAX_LENGTH}
+                          </span>
+                        </div>
                       </div>
-                      <div className="relative">
-                        <textarea
-                          className="textarea textarea-bordered w-full resize-none rounded-xl bg-base-100 pb-6 leading-relaxed"
-                          rows={3}
-                          maxLength={MEMBER_MAX_LENGTH}
-                          value={text}
-                          onChange={(e) => updateMember(index, e.target.value)}
-                          placeholder={`${index + 1}人目の希望（例：安めがいい。麺類以外。）`}
-                        />
-                        <span className="pointer-events-none absolute bottom-2 right-3 text-xs text-base-content/40">
-                          {text.length}/{MEMBER_MAX_LENGTH}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
 
-                  <button
-                    type="button"
-                    className="w-full rounded-xl border-2 border-dashed border-info/60 py-2.5 text-sm font-semibold text-info transition hover:bg-info/5"
-                    onClick={addMember}
-                  >
-                    ＋ 参加者を追加
-                  </button>
+                    <button
+                      type="button"
+                      className="w-full rounded-xl border-2 border-dashed border-info/60 py-2.5 text-sm font-semibold text-info transition hover:bg-info/5"
+                      onClick={addMember}
+                    >
+                      ＋ 参加者を追加
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* ── エリア・現在地 ── */}
               <div className="card bg-base-100 shadow-sm">
@@ -303,84 +412,171 @@ export default function HomePage() {
                     エリア・現在地
                   </SectionTitle>
 
-                  <button
-                    type="button"
-                    className="btn btn-primary w-full gap-2 rounded-xl"
-                    onClick={handleGetLocation}
-                    disabled={geo.kind === "loading"}
-                  >
-                    {geo.kind === "loading" ? (
-                      <span className="loading loading-spinner loading-xs" />
-                    ) : (
-                      <LocationPinIcon className="h-5 w-5" />
-                    )}
-                    現在地から探す
-                  </button>
-
-                  {geo.kind === "success" && (
-                    <div className="flex items-start gap-2 rounded-xl bg-success/10 px-3 py-2.5">
-                      <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-success" />
-                      <div>
-                        <p className="text-sm font-semibold text-success">
-                          現在地を取得しました
-                        </p>
-                        <p className="text-xs text-base-content/60">
-                          {location.lat.toFixed(4)}, {location.lng.toFixed(4)}{" "}
-                          付近
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {geo.kind === "error" && (
-                    <p className="text-sm text-error">{geo.message}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* ── 検索範囲 ── */}
-              <div className="card bg-base-100 shadow-sm">
-                <div className="card-body gap-3 p-4">
-                  <SectionTitle
-                    icon={<TargetIcon className="h-4 w-4 text-primary" />}
-                  >
-                    検索範囲
-                  </SectionTitle>
-
-                  <div className="grid grid-cols-4 gap-2">
-                    {RANGE_OPTIONS.map((option) => {
-                      const active = range === option.code;
+                  {/* 現在地 / エリア選択 の切り替え。 */}
+                  <div className="grid grid-cols-2 gap-2 rounded-xl bg-base-200 p-1">
+                    {[
+                      { value: "current", label: "現在地から" },
+                      { value: "area", label: "エリアを選ぶ" },
+                    ].map((option) => {
+                      const active = locationMode === option.value;
                       return (
                         <button
-                          key={option.code}
+                          key={option.value}
                           type="button"
-                          className={`rounded-xl py-2 text-sm font-semibold transition ${
+                          onClick={() => setLocationMode(option.value)}
+                          className={`rounded-lg py-2 text-sm font-semibold transition ${
                             active
-                              ? "bg-primary text-primary-content shadow-sm"
-                              : "bg-base-200 text-base-content/70 hover:bg-base-300"
+                              ? "bg-base-100 text-primary shadow-sm"
+                              : "text-base-content/60"
                           }`}
-                          onClick={() => setRange(option.code)}
                         >
                           {option.label}
                         </button>
                       );
                     })}
                   </div>
+
+                  {locationMode === "current" ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-primary w-full gap-2 rounded-xl"
+                        onClick={handleGetLocation}
+                        disabled={geo.kind === "loading"}
+                      >
+                        {geo.kind === "loading" ? (
+                          <span className="loading loading-spinner loading-xs" />
+                        ) : (
+                          <LocationPinIcon className="h-5 w-5" />
+                        )}
+                        現在地から探す
+                      </button>
+
+                      {geo.kind === "success" && (
+                        <div className="flex items-start gap-2 rounded-xl bg-success/10 px-3 py-2.5">
+                          <CheckCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-success" />
+                          <div>
+                            <p className="text-sm font-semibold text-success">
+                              現在地を取得しました
+                            </p>
+                            <p className="text-xs text-base-content/60">
+                              {location.lat.toFixed(4)},{" "}
+                              {location.lng.toFixed(4)} 付近
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {geo.kind === "error" && (
+                        <p className="text-sm text-error">{geo.message}</p>
+                      )}
+                    </>
+                  ) : (
+                    <div className="space-y-2">
+                      <select
+                        className="select select-bordered w-full rounded-xl"
+                        value={largeAreaCode}
+                        onChange={(e) => {
+                          setLargeAreaCode(e.target.value);
+                          // 大エリアを変えたら中エリアの選択はリセットする。
+                          setMiddleAreaCode("");
+                        }}
+                        aria-label="大エリア"
+                      >
+                        <option value="">エリア（都道府県など）を選ぶ</option>
+                        {areas.largeAreas.map((area) => (
+                          <option key={area.code} value={area.code}>
+                            {area.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        className="select select-bordered w-full rounded-xl"
+                        value={middleAreaCode}
+                        onChange={(e) => setMiddleAreaCode(e.target.value)}
+                        disabled={!largeAreaCode}
+                        aria-label="中エリア"
+                      >
+                        <option value="">
+                          {largeAreaCode
+                            ? "詳しいエリアを選ぶ"
+                            : "先に上のエリアを選んでください"}
+                        </option>
+                        {middleAreaOptions.map((area) => (
+                          <option key={area.code} value={area.code}>
+                            {area.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <button
-                type="submit"
-                className="btn btn-accent w-full gap-2 rounded-xl text-base shadow-md"
-                disabled={loading}
-              >
-                {loading ? (
-                  <span className="loading loading-spinner loading-sm" />
-                ) : (
-                  <SearchIcon className="h-5 w-5" />
-                )}
-                {loading ? "お店を探しています..." : "お店を探す"}
-              </button>
+              {/* ── 検索範囲（現在地モードのみ） ── */}
+              {locationMode === "current" && (
+                <div className="card bg-base-100 shadow-sm">
+                  <div className="card-body gap-3 p-4">
+                    <SectionTitle
+                      icon={<TargetIcon className="h-4 w-4 text-primary" />}
+                    >
+                      検索範囲
+                    </SectionTitle>
+
+                    <div className="grid grid-cols-4 gap-2">
+                      {RANGE_OPTIONS.map((option) => {
+                        const active = range === option.code;
+                        return (
+                          <button
+                            key={option.code}
+                            type="button"
+                            className={`rounded-xl py-2 text-sm font-semibold transition ${
+                              active
+                                ? "bg-primary text-primary-content shadow-sm"
+                                : "bg-base-200 text-base-content/70 hover:bg-base-300"
+                            }`}
+                            onClick={() => setRange(option.code)}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {mode === "solo" ? (
+                <button
+                  type="submit"
+                  className="btn btn-accent w-full gap-2 rounded-xl text-base shadow-md"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <span className="loading loading-spinner loading-sm" />
+                  ) : (
+                    <SearchIcon className="h-5 w-5" />
+                  )}
+                  {loading ? "お店を探しています..." : "お店を探す"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCreateRoom}
+                  className="btn btn-accent w-full gap-2 rounded-xl text-base shadow-md"
+                  disabled={creating}
+                >
+                  {creating ? (
+                    <span className="loading loading-spinner loading-sm" />
+                  ) : (
+                    <ArrowRightIcon className="h-5 w-5" />
+                  )}
+                  {creating
+                    ? "部屋を作成しています..."
+                    : "この条件で部屋を作る"}
+                </button>
+              )}
             </form>
           </div>
         ) : (
@@ -403,7 +599,14 @@ export default function HomePage() {
                 <ShopList
                   shops={result.shops}
                   areaLabel={result.areaLabel}
-                  rangeLabel={selectedRangeLabel}
+                  rangeLabel={
+                    // エリアモード（range=null）では範囲ラベルを出さない。
+                    result.range
+                      ? (RANGE_OPTIONS.find(
+                          (option) => option.code === result.range,
+                        )?.label ?? "")
+                      : undefined
+                  }
                 />
 
                 <p className="pt-1 text-center text-xs text-base-content/50 lg:text-left">
@@ -414,6 +617,37 @@ export default function HomePage() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+/** 入力方法（1台 / 部屋）を切り替えるセグメントコントロール。 */
+function ModeSwitch({ mode, onChange }) {
+  const options = [
+    { value: "solo", label: "1台でまとめて", icon: PencilIcon },
+    { value: "group", label: "みんなの端末で", icon: PeopleIcon },
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-2 rounded-2xl bg-base-100 p-1.5 shadow-sm">
+      {options.map((option) => {
+        const active = mode === option.value;
+        const Icon = option.icon;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            className={`flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold transition ${
+              active
+                ? "bg-primary text-primary-content shadow-sm"
+                : "text-base-content/60 hover:bg-base-200"
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

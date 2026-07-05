@@ -32,12 +32,14 @@ export async function searchShops(
   request: RecommendRequest,
   preferences: GroupPreference,
 ): Promise<ShopRecommendation[]> {
-  // 検索範囲コード（1..5）を距離上限（メートル）に変換する。
+  // エリアモード（現在地なし）では距離での絞り込みは行わない。
+  // 実API接続時は、この分岐で middle_area 等のエリアパラメータを渡す。
+  const isAreaMode = !request.location && Boolean(request.areaCode);
   const maxDistance = RANGE_TO_METERS[request.range] ?? 1000;
 
   const candidates = MOCK_SHOPS.filter((shop) => {
-    // 範囲外の店は除外する。
-    if (shop.distanceMeters > maxDistance) {
+    // 現在地モードのときだけ範囲外の店を除外する。
+    if (!isAreaMode && shop.distanceMeters > maxDistance) {
       return false;
     }
     // AIが避けたいと判断したジャンルは除外する。

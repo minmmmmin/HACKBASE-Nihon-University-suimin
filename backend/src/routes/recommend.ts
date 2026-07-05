@@ -1,9 +1,31 @@
 import { Router } from "express";
+import { findMiddleArea } from "../data/areas.js";
 import { recommendRequestSchema } from "../schemas/recommend.js";
 import { parseGroupPreferences } from "../services/gemini.js";
 import { searchShops } from "../services/hotpepper.js";
 
 const router = Router();
+
+/**
+ * 結果表示用のメタ情報を組み立てる。
+ * エリアモードなら中エリア名（範囲は使わないので null）、
+ * 現在地モードなら「現在地周辺」＋範囲コードを返す。
+ */
+export function resolveResultMeta(request: {
+  location?: unknown;
+  areaCode?: string;
+  areaName?: string;
+  range: number;
+}): { areaLabel: string; range: number | null } {
+  if (!request.location && request.areaCode) {
+    const label =
+      request.areaName ??
+      findMiddleArea(request.areaCode)?.name ??
+      "指定エリア";
+    return { areaLabel: label, range: null };
+  }
+  return { areaLabel: "現在地周辺", range: request.range };
+}
 
 /**
  * 店舗推薦API。
@@ -26,7 +48,8 @@ router.post("/", async (req, res, next) => {
   try {
     const conditions = await parseGroupPreferences(result.data);
     const shops = await searchShops(result.data, conditions);
-    res.json({ conditions, shops });
+    const meta = resolveResultMeta(result.data);
+    res.json({ conditions, shops, ...meta });
   } catch (err) {
     // Gemini / HotPepper 呼び出しの失敗は共通エラーハンドラへ委譲する。
     next(err);
