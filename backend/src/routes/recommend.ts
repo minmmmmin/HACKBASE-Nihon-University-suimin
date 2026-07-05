@@ -7,10 +7,30 @@ router.post("/", async (req, res, _next) => {
   
   const obj = req.body;
 
-  const reply = askGemini(obj.members[0].text);
+  const reply = await askGemini(obj.members[0].text);
 
-  res.json({ message: reply });
-  
+  const result = {
+    conditions: {
+      budgetLevel: "any",
+      excludedGenres: ["居酒屋"],
+      preferredGenres: ["イタリアン"],
+      preferredAtmosphere: ["静か"],
+      maxWalkingMinutes: 10
+    },
+    shops: [
+      {
+        id: "shop_001",
+        name: "イタリアンレストラン英",
+        budget: "~1000円",
+        access: "新宿駅から徒歩5分",
+        reason: reply,
+        distanceMeters: 420,
+        imageUrl: "https://example.com/shop.jpg"
+      }
+    ]
+  };
+  console.log("AI says" + reply);
+  res.status(200).send(result);
 });
 
 export default router;
