@@ -62,16 +62,67 @@ export async function searchShops(
   return searchShopsWithHotPepper(request, preferences, apiKey);
 }
 
+// 一度のキーワード検索で使うジャンル数の上限。API呼び出し回数を抑えるため。
+const MAX_GENRE_KEYWORDS = 3;
+
 async function searchShopsWithHotPepper(
   request: RecommendRequest,
   preferences: GroupPreference,
   apiKey: string,
 ): Promise<ShopRecommendation[]> {
+  // 好みのジャンルを検索キーワードとして渡し、そのジャンルの店を候補に含める。
+  // 位置・エリアだけで検索していると、例えば「ラーメン」と入力しても近くに
+  // ラーメン店が無ければ候補にすら入らなかった。ジャンルごとに検索して集める。
+  const preferredGenres = preferences.preferredGenres.slice(
+    0,
+    MAX_GENRE_KEYWORDS,
+  );
+
+  // ジャンルごとのキーワード検索に加え、キーワード無しの汎用検索も混ぜる。
+  // 汎用検索を残すことで、希望が割れたグループでも妥協候補（ジャンル外の店）を確保する。
+  const keywords: (string | null)[] =
+    preferredGenres.length > 0 ? [...preferredGenres, null] : [null];
+
+  const shopLists = await Promise.all(
+    keywords.map((keyword) => fetchHotPepperShops(request, apiKey, keyword)),
+  );
+
+  // 複数検索の結果を id で重複除去してから採点・並び替えする。
+  const seen = new Set<string>();
+  const uniqueShops: HotPepperShop[] = [];
+  for (const shop of shopLists.flat()) {
+    if (shop.id && !seen.has(shop.id)) {
+      seen.add(shop.id);
+      uniqueShops.push(shop);
+    }
+  }
+
+  return uniqueShops
+    .map((shop) => toScoredRecommendation(shop, request, preferences))
+    .filter((item: ScoredShop | null): item is ScoredShop => item !== null)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 30)
+    .map(({ shop }) => shop);
+}
+
+/**
+ * ホットペッパーAPIを1回叩いて店舗配列を返す。
+ * keyword を渡すと、その語（ジャンル名など）で絞り込んで検索する。
+ */
+async function fetchHotPepperShops(
+  request: RecommendRequest,
+  apiKey: string,
+  keyword: string | null,
+): Promise<HotPepperShop[]> {
   const url = new URL("https://webservice.recruit.co.jp/hotpepper/gourmet/v1/");
   url.searchParams.set("key", apiKey);
   url.searchParams.set("format", "json");
   url.searchParams.set("count", "30");
   url.searchParams.set("order", "4");
+
+  if (keyword) {
+    url.searchParams.set("keyword", keyword);
+  }
 
   if (request.location) {
     url.searchParams.set("lat", String(request.location.lat));
@@ -90,16 +141,7 @@ async function searchShopsWithHotPepper(
 
   const data = await response.json();
   const rawShops = data?.results?.shop;
-  const shops = Array.isArray(rawShops) ? rawShops : [];
-
-  return shops
-    .map((shop: HotPepperShop) =>
-      toScoredRecommendation(shop, request, preferences),
-    )
-    .filter((item: ScoredShop | null): item is ScoredShop => item !== null)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 30)
-    .map(({ shop }) => shop);
+  return Array.isArray(rawShops) ? rawShops : [];
 }
 
 function toScoredRecommendation(
