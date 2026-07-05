@@ -38,57 +38,6 @@ const RANGE_OPTIONS = [
   { code: 4, label: "2km" },
 ];
 
-// バックエンド未接続でも結果画面（モック2枚目）を確認できるようにするサンプル。
-// API通信が成功した場合はこの内容を実データで置き換える。
-const SAMPLE_RESULT = {
-  areaLabel: "渋谷周辺",
-  summary:
-    "みんなの希望をまとめると、予算は安めで静かに落ち着いて話せるお店がぴったりでした。麺類は避けたいとのことなので候補から外しています。中でも「和ごはん かえで」は駅近で和食中心と、条件との相性がいちばん高いおすすめです。",
-  conditions: {
-    budgetLevel: "low",
-    excludedGenres: ["麺類"],
-    preferredGenres: [],
-    preferredAtmosphere: ["静かさ", "駅近"],
-    maxWalkingMinutes: null,
-  },
-  shops: [
-    {
-      id: "sample-1",
-      name: "和ごはん かえで",
-      genre: "和食・定食",
-      budget: "安め",
-      access: "徒歩3分（250m）",
-      reason:
-        "落ち着いた雰囲気で会話がしやすく、和食中心でご希望にぴったりです。",
-      distanceMeters: 250,
-      matchScore: 92,
-      iconType: "bowl",
-    },
-    {
-      id: "sample-2",
-      name: "café lume（カフェルメ）",
-      genre: "カフェ・カフェごはん",
-      budget: "安め",
-      access: "徒歩4分（350m）",
-      reason: "カフェのような落ち着いた空間で、駅近＆静かに過ごせます。",
-      distanceMeters: 350,
-      matchScore: 86,
-      iconType: "coffee",
-    },
-    {
-      id: "sample-3",
-      name: "定食や まるや",
-      genre: "定食・和食",
-      budget: "安め",
-      access: "徒歩6分（550m）",
-      reason: "コスパの良い定食が充実！和食好きにおすすめです。",
-      distanceMeters: 550,
-      matchScore: 78,
-      iconType: "bowl",
-    },
-  ],
-};
-
 export default function HomePage() {
   const navigate = useNavigate();
 
@@ -272,9 +221,7 @@ export default function HomePage() {
         });
       }
     } catch {
-      // バックエンド未接続でもモック2枚目を確認できるよう、サンプル結果を表示する。
-      setResult(SAMPLE_RESULT);
-      setView("result");
+      setResult(null);
       setStatus({
         kind: "error",
         message:

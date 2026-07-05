@@ -20,6 +20,7 @@ import {
  * @property {number} distanceMeters
  * @property {number} [matchScore]      AIが算出した相性スコア（%）
  * @property {"bowl" | "coffee" | "utensils"} [iconType]  サムネイルの種類
+ * @property {string} [url]             HotPepperの店舗詳細URL
  */
 
 /** サムネイルアイコンの種類マップ。未指定・不明な種類はフォークで代替する。 */
@@ -135,12 +136,23 @@ function ShopCard({ shop }) {
       </div>
 
       <div className="flex justify-end p-3 pt-2.5">
-        <button
-          type="button"
-          className="rounded-lg border border-primary px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5"
-        >
-          店舗詳細を見る
-        </button>
+        {shop.url ? (
+          <a
+            href={shop.url}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border border-primary px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5"
+          >
+            店舗詳細を見る
+          </a>
+        ) : (
+          <button
+            type="button"
+            className="rounded-lg border border-primary px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5"
+          >
+            店舗詳細を見る
+          </button>
+        )}
       </div>
     </article>
   );

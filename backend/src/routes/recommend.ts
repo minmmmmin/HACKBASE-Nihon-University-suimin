@@ -49,7 +49,7 @@ router.post("/", async (req, res, next) => {
     const conditions = await parseGroupPreferences(result.data);
     const shops = await searchShops(result.data, conditions);
     const meta = resolveResultMeta(result.data);
-    res.json({ conditions, shops, ...meta });
+    res.json({ conditions, summary: conditions.summary, shops, ...meta });
   } catch (err) {
     // Gemini / HotPepper 呼び出しの失敗は共通エラーハンドラへ委譲する。
     next(err);

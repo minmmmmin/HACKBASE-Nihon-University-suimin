@@ -9,98 +9,150 @@ export interface GroupPreference {
   preferredGenres: string[];
   preferredAtmosphere: string[];
   maxWalkingMinutes: number | null;
+  summary: string;
 }
 
 /**
  * 複数人の自由文を飲食店検索用の条件へ構造化する。
  *
- * 現時点では Gemini API を接続せず、キーワードによる簡易ルールで
- * GroupPreference を組み立てるモック実装。将来ここを実LLM呼び出しに
- * 差し替える想定のため、非同期シグネチャと戻り値の型は温存する。
+ * Gemini API で毎回生成し、自由文を構造化する。
  */
 export async function parseGroupPreferences(
   request: RecommendRequest,
 ): Promise<GroupPreference> {
-  // 全員分の自由文を連結して、キーワード判定の対象にする。
-  const text = request.members.map((m) => m.text).join("\n");
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is required.");
+  }
+
+  return parseGroupPreferencesWithGemini(request, apiKey);
+}
+
+async function parseGroupPreferencesWithGemini(
+  request: RecommendRequest,
+  apiKey: string,
+): Promise<GroupPreference> {
+  const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
+  const url = new URL(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+  );
+  url.searchParams.set("key", apiKey);
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: buildPrompt(request),
+            },
+          ],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.2,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            budgetLevel: {
+              type: "string",
+              enum: ["low", "medium", "high", "any"],
+            },
+            excludedGenres: {
+              type: "array",
+              items: { type: "string" },
+            },
+            preferredGenres: {
+              type: "array",
+              items: { type: "string" },
+            },
+            preferredAtmosphere: {
+              type: "array",
+              items: { type: "string" },
+            },
+            maxWalkingMinutes: {
+              anyOf: [{ type: "integer" }, { type: "null" }],
+            },
+            summary: { type: "string" },
+          },
+          required: [
+            "budgetLevel",
+            "excludedGenres",
+            "preferredGenres",
+            "preferredAtmosphere",
+            "maxWalkingMinutes",
+            "summary",
+          ],
+        },
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Gemini API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (typeof text !== "string") {
+    throw new Error("Gemini API returned no text candidate.");
+  }
+
+  return normalizePreference(JSON.parse(text));
+}
+
+function buildPrompt(request: RecommendRequest): string {
+  const members = request.members
+    .map((member, index) => `${index + 1}人目: ${member.text}`)
+    .join("\n");
+
+  return [
+    "あなたは複数人の食事希望を、飲食店検索に使える条件へ整理するアシスタントです。",
+    "回答は指定されたJSONスキーマのみで返してください。",
+    "budgetLevelは low=安め, medium=普通, high=高め, any=指定なし です。",
+    "excludedGenresとpreferredGenresは日本語の短いジャンル名にしてください。",
+    "preferredAtmosphereは「静か」「賑やか」「個室」「駅近」などの短いタグにしてください。",
+    "maxWalkingMinutesは徒歩希望が読み取れる場合だけ整数、なければnullにしてください。",
+    "summaryは推薦結果画面に出す、80文字程度の日本語の総評にしてください。",
+    "",
+    members,
+  ].join("\n");
+}
+
+function normalizePreference(value: unknown): GroupPreference {
+  const raw = value as Partial<GroupPreference>;
+  const budgetLevel =
+    raw.budgetLevel === "low" ||
+    raw.budgetLevel === "medium" ||
+    raw.budgetLevel === "high" ||
+    raw.budgetLevel === "any"
+      ? raw.budgetLevel
+      : "any";
 
   return {
-    budgetLevel: detectBudgetLevel(text),
-    excludedGenres: detectExcludedGenres(text),
-    preferredGenres: detectPreferredGenres(text),
-    preferredAtmosphere: detectAtmosphere(text),
-    maxWalkingMinutes: detectMaxWalkingMinutes(text),
+    budgetLevel,
+    excludedGenres: normalizeStringArray(raw.excludedGenres),
+    preferredGenres: normalizeStringArray(raw.preferredGenres),
+    preferredAtmosphere: normalizeStringArray(raw.preferredAtmosphere),
+    maxWalkingMinutes:
+      typeof raw.maxWalkingMinutes === "number" ? raw.maxWalkingMinutes : null,
+    summary:
+      typeof raw.summary === "string" && raw.summary.trim().length > 0
+        ? raw.summary.trim()
+        : "みんなの希望を整理して、条件に合いそうなお店をおすすめ順に並べました。",
   };
 }
 
-/** 予算感を推定する。 */
-function detectBudgetLevel(text: string): GroupPreference["budgetLevel"] {
-  if (/金欠|安め|安く|安い|節約|リーズナブル/.test(text)) {
-    return "low";
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
   }
-  if (/高級|贅沢|奮発|ちょっといい/.test(text)) {
-    return "high";
-  }
-  if (/普通|そこそこ/.test(text)) {
-    return "medium";
-  }
-  return "any";
-}
-
-/** 避けたいジャンルを推定する。 */
-function detectExcludedGenres(text: string): string[] {
-  const excluded: string[] = [];
-  if (/麺類以外|麺以外|ラーメン(?:は|以外)|昨日ラーメン/.test(text)) {
-    excluded.push("ラーメン");
-  }
-  if (/揚げ物(?:は)?(?:嫌|避け|以外)|脂っこ/.test(text)) {
-    excluded.push("揚げ物");
-  }
-  return excluded;
-}
-
-/** 希望ジャンルを推定する。 */
-function detectPreferredGenres(text: string): string[] {
-  const preferred: string[] = [];
-  if (/居酒屋|飲み|お酒/.test(text)) {
-    preferred.push("居酒屋");
-  }
-  if (/和食|寿司|そば|うどん/.test(text)) {
-    preferred.push("和食");
-  }
-  if (/イタリアン|パスタ|ピザ/.test(text)) {
-    preferred.push("イタリアン");
-  }
-  if (/カフェ|甘い物|スイーツ/.test(text)) {
-    preferred.push("カフェ");
-  }
-  return preferred;
-}
-
-/** 希望する雰囲気を推定する。 */
-function detectAtmosphere(text: string): string[] {
-  const atmosphere: string[] = [];
-  if (/静か|落ち着い|ゆっくり/.test(text)) {
-    atmosphere.push("静か");
-  }
-  if (/賑やか|わいわい|盛り上が/.test(text)) {
-    atmosphere.push("賑やか");
-  }
-  if (/個室/.test(text)) {
-    atmosphere.push("個室");
-  }
-  return atmosphere;
-}
-
-/** 許容する徒歩時間（分）を推定する。指定がなければ null。 */
-function detectMaxWalkingMinutes(text: string): number | null {
-  // 「徒歩5分」のように明示された数値を優先する。
-  const explicit = text.match(/徒歩(\d+)分/);
-  if (explicit) {
-    return Number(explicit[1]);
-  }
-  if (/歩きたくない|近く|駅近|あまり歩/.test(text)) {
-    return 5;
-  }
-  return null;
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 }

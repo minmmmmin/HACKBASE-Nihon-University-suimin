@@ -161,7 +161,7 @@ router.post("/:id/recommend", async (req, res, next) => {
     const conditions = await parseGroupPreferences(request);
     const shops = await searchShops(request, conditions);
     const meta = resolveResultMeta(request);
-    const result = { conditions, shops, ...meta };
+    const result = { conditions, summary: conditions.summary, shops, ...meta };
     setRoomResult(room, result);
     res.json(result);
   } catch (err) {

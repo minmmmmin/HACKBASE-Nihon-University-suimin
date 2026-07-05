@@ -13,174 +13,259 @@ export interface ShopRecommendation {
   reason: string;
   /** 現在地からのおおよその距離（メートル）。 */
   distanceMeters: number;
+  matchScore: number;
+  iconType: "bowl" | "coffee" | "utensils";
+  url?: string;
 }
 
-/** スコアリング用の内部属性を持つモック店舗。 */
-interface MockShop extends ShopRecommendation {
-  budgetLevel: string;
-  atmosphere: string[];
+interface HotPepperShop {
+  id: string;
+  name: string;
+  genre?: { name?: string; catch?: string };
+  budget?: { name?: string; average?: string };
+  access?: string;
+  catch?: string;
+  lat?: number;
+  lng?: number;
+  urls?: { pc?: string };
+}
+
+interface ScoredShop {
+  shop: ShopRecommendation;
+  score: number;
 }
 
 /**
  * ホットペッパーグルメAPIから店舗候補を取得する。
- *
- * 現時点では実APIを接続せず、固定の候補からAI整理条件で軽く出し分ける
- * モック実装。将来ここを fetch による実API呼び出しへ差し替える想定のため、
- * 非同期シグネチャと戻り値の型は温存する。
  */
 export async function searchShops(
   request: RecommendRequest,
   preferences: GroupPreference,
 ): Promise<ShopRecommendation[]> {
-  // エリアモード（現在地なし）では距離での絞り込みは行わない。
-  // 実API接続時は、この分岐で middle_area 等のエリアパラメータを渡す。
-  const isAreaMode = !request.location && Boolean(request.areaCode);
-  const maxDistance = RANGE_TO_METERS[request.range] ?? 1000;
+  const apiKey = process.env.HOTPEPPER_API_KEY;
+  if (!apiKey) {
+    throw new Error("HOTPEPPER_API_KEY is required.");
+  }
 
-  const candidates = MOCK_SHOPS.filter((shop) => {
-    // 現在地モードのときだけ範囲外の店を除外する。
-    if (!isAreaMode && shop.distanceMeters > maxDistance) {
-      return false;
-    }
-    // AIが避けたいと判断したジャンルは除外する。
-    if (preferences.excludedGenres.includes(shop.genre)) {
-      return false;
-    }
-    return true;
-  });
-
-  // AIおすすめ順スコアを付けて降順に並べる（配列先頭ほどおすすめ）。
-  // スコアリング用の内部属性（budgetLevel / atmosphere）は公開レスポンスから除く。
-  return candidates
-    .map((shop) => ({ shop, score: scoreShop(shop, preferences) }))
-    .sort((a, b) => b.score - a.score)
-    .map(({ shop }) => ({
-      id: shop.id,
-      name: shop.name,
-      genre: shop.genre,
-      budget: shop.budget,
-      access: shop.access,
-      reason: shop.reason,
-      distanceMeters: shop.distanceMeters,
-    }));
+  return searchShopsWithHotPepper(request, preferences, apiKey);
 }
 
-/** 検索範囲コード → 距離上限（メートル）。 */
-const RANGE_TO_METERS: Record<number, number> = {
-  1: 300,
-  2: 500,
-  3: 1000,
-  4: 2000,
-  5: 3000,
-};
+async function searchShopsWithHotPepper(
+  request: RecommendRequest,
+  preferences: GroupPreference,
+  apiKey: string,
+): Promise<ShopRecommendation[]> {
+  const url = new URL("https://webservice.recruit.co.jp/hotpepper/gourmet/v1/");
+  url.searchParams.set("key", apiKey);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("count", "30");
+  url.searchParams.set("order", "4");
 
-/** AI整理条件に対する店舗の適合スコアを算出する。 */
-function scoreShop(shop: MockShop, preferences: GroupPreference): number {
+  if (request.location) {
+    url.searchParams.set("lat", String(request.location.lat));
+    url.searchParams.set("lng", String(request.location.lng));
+    url.searchParams.set("range", String(request.range));
+  } else if (request.areaCode) {
+    url.searchParams.set("middle_area", request.areaCode);
+  }
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`HotPepper API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const rawShops = data?.results?.shop;
+  const shops = Array.isArray(rawShops) ? rawShops : [];
+
+  return shops
+    .map((shop: HotPepperShop) =>
+      toScoredRecommendation(shop, request, preferences),
+    )
+    .filter((item: ScoredShop | null): item is ScoredShop => item !== null)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map(({ shop }) => shop);
+}
+
+function toScoredRecommendation(
+  shop: HotPepperShop,
+  request: RecommendRequest,
+  preferences: GroupPreference,
+): ScoredShop | null {
+  if (!shop.id || !shop.name) {
+    return null;
+  }
+
+  const genre = shop.genre?.name ?? "飲食店";
+  if (isExcludedGenre(genre, preferences.excludedGenres)) {
+    return null;
+  }
+
+  const distanceMeters =
+    request.location &&
+    typeof shop.lat === "number" &&
+    typeof shop.lng === "number"
+      ? calculateDistanceMeters(request.location, {
+          lat: shop.lat,
+          lng: shop.lng,
+        })
+      : 0;
+  const budget = shop.budget?.average ?? shop.budget?.name ?? "予算情報なし";
+  const score = scoreShop(
+    {
+      genre,
+      name: shop.name,
+      catchText: shop.catch ?? shop.genre?.catch ?? "",
+      access: shop.access ?? "",
+      budget,
+      distanceMeters,
+    },
+    preferences,
+  );
+
+  return {
+    score,
+    shop: {
+      id: shop.id,
+      name: shop.name,
+      genre,
+      budget,
+      access: formatAccess(shop.access, distanceMeters),
+      reason: buildReason(shop, preferences),
+      distanceMeters,
+      matchScore: clamp(Math.round(65 + score * 4), 60, 98),
+      iconType: pickIconType(genre),
+      url: shop.urls?.pc,
+    },
+  };
+}
+
+function isExcludedGenre(genre: string, excludedGenres: string[]): boolean {
+  return excludedGenres.some((excluded) => genre.includes(excluded));
+}
+
+function scoreShop(
+  shop: {
+    genre: string;
+    name: string;
+    catchText: string;
+    access: string;
+    budget: string;
+    distanceMeters: number;
+  },
+  preferences: GroupPreference,
+): number {
   let score = 0;
+  const searchable = `${shop.genre} ${shop.name} ${shop.catchText} ${shop.access} ${shop.budget}`;
 
-  if (preferences.preferredGenres.includes(shop.genre)) {
-    score += 3;
+  for (const genre of preferences.preferredGenres) {
+    if (searchable.includes(genre)) {
+      score += 3;
+    }
+  }
+  for (const atmosphere of preferences.preferredAtmosphere) {
+    if (searchable.includes(atmosphere)) {
+      score += 2;
+    }
   }
   if (
     preferences.budgetLevel !== "any" &&
-    shop.budgetLevel === preferences.budgetLevel
+    budgetMatches(shop.budget, preferences.budgetLevel)
   ) {
     score += 2;
   }
-  // 希望する雰囲気タグが一致するほど加点する。
-  for (const atmosphere of preferences.preferredAtmosphere) {
-    if (shop.atmosphere.includes(atmosphere)) {
-      score += 1;
+  if (preferences.maxWalkingMinutes != null && shop.distanceMeters > 0) {
+    const maxMeters = preferences.maxWalkingMinutes * 80;
+    if (shop.distanceMeters <= maxMeters) {
+      score += 2;
     }
   }
-  // 徒歩上限がある場合、近い店を優遇する。
-  if (preferences.maxWalkingMinutes != null && shop.distanceMeters <= 400) {
+  if (shop.distanceMeters > 0 && shop.distanceMeters <= 500) {
     score += 1;
   }
 
   return score;
 }
 
-/**
- * モックの店舗マスタ。budgetLevel / atmosphere はスコアリング用の内部属性で、
- * レスポンスにはそのまま含めず reason などの表示項目へ反映する。
- */
-const MOCK_SHOPS: MockShop[] = [
-  {
-    id: "shop-001",
-    name: "居酒屋 のんびり亭",
-    genre: "居酒屋",
-    budget: "2,000〜3,000円",
-    access: "東京駅八重洲口から徒歩3分",
-    reason: "個室で静かに話せて、リーズナブルな一品料理が豊富です。",
-    distanceMeters: 240,
-    budgetLevel: "low",
-    atmosphere: ["静か", "個室"],
-  },
-  {
-    id: "shop-002",
-    name: "和ダイニング 花みずき",
-    genre: "和食",
-    budget: "3,000〜4,000円",
-    access: "東京駅丸の内南口から徒歩5分",
-    reason: "落ち着いた和の空間で、麺類以外の和定食が充実しています。",
-    distanceMeters: 420,
-    budgetLevel: "medium",
-    atmosphere: ["静か"],
-  },
-  {
-    id: "shop-003",
-    name: "トラットリア ソーレ",
-    genre: "イタリアン",
-    budget: "3,500〜5,000円",
-    access: "東京駅八重洲中央口から徒歩6分",
-    reason: "手打ちパスタと窯焼きピザが自慢。賑やかで盛り上がれます。",
-    distanceMeters: 650,
-    budgetLevel: "medium",
-    atmosphere: ["賑やか"],
-  },
-  {
-    id: "shop-004",
-    name: "らーめん 一途",
-    genre: "ラーメン",
-    budget: "800〜1,200円",
-    access: "東京駅日本橋口から徒歩2分",
-    reason: "濃厚スープが人気の行列店。安く手早く食べられます。",
-    distanceMeters: 180,
-    budgetLevel: "low",
-    atmosphere: ["賑やか"],
-  },
-  {
-    id: "shop-005",
-    name: "喫茶 ことり",
-    genre: "カフェ",
-    budget: "1,000〜1,500円",
-    access: "東京駅丸の内北口から徒歩4分",
-    reason: "静かで長居しやすい老舗喫茶。軽食とスイーツが楽しめます。",
-    distanceMeters: 360,
-    budgetLevel: "low",
-    atmosphere: ["静か"],
-  },
-  {
-    id: "shop-006",
-    name: "個室和食 まつり",
-    genre: "和食",
-    budget: "4,000〜6,000円",
-    access: "東京駅八重洲南口から徒歩8分",
-    reason: "全席個室でゆったり。少し贅沢したい日の会食に向きます。",
-    distanceMeters: 900,
-    budgetLevel: "high",
-    atmosphere: ["静か", "個室"],
-  },
-  {
-    id: "shop-007",
-    name: "大衆酒場 かんぱい",
-    genre: "居酒屋",
-    budget: "1,500〜2,500円",
-    access: "東京駅八重洲口から徒歩10分",
-    reason: "わいわい賑やかに飲める大衆酒場。コスパ重視の方に。",
-    distanceMeters: 1400,
-    budgetLevel: "low",
-    atmosphere: ["賑やか"],
-  },
-];
+function budgetMatches(
+  budget: string,
+  level: Exclude<GroupPreference["budgetLevel"], "any">,
+): boolean {
+  const numbers =
+    budget
+      .match(/\d[\d,]*/g)
+      ?.map((value) => Number(value.replace(/,/g, ""))) ?? [];
+  const maxBudget = numbers.length > 0 ? Math.max(...numbers) : null;
+
+  if (level === "low") {
+    return maxBudget != null
+      ? maxBudget <= 3000
+      : /1000|2000|安|リーズナブル/.test(budget);
+  }
+  if (level === "medium") {
+    return maxBudget != null
+      ? maxBudget > 2000 && maxBudget <= 5000
+      : /3000|4000|普通/.test(budget);
+  }
+  return maxBudget != null ? maxBudget >= 5000 : /5000|高級|贅沢/.test(budget);
+}
+
+function formatAccess(
+  access: string | undefined,
+  distanceMeters: number,
+): string {
+  if (distanceMeters > 0) {
+    return `${access || "アクセス情報なし"}（直線約${distanceMeters}m）`;
+  }
+  return access || "アクセス情報なし";
+}
+
+function buildReason(
+  shop: HotPepperShop,
+  preferences: GroupPreference,
+): string {
+  const genre = shop.genre?.name ?? "飲食店";
+  const catchText = shop.catch ?? shop.genre?.catch;
+  const atmosphere =
+    preferences.preferredAtmosphere.length > 0
+      ? `${preferences.preferredAtmosphere.join("・")}の希望`
+      : "みんなの希望";
+  const base = catchText ? `${catchText} ` : "";
+  return `${base}${genre}として${atmosphere}に合いやすい候補です。`;
+}
+
+function pickIconType(genre: string): ShopRecommendation["iconType"] {
+  if (/ラーメン|そば|うどん|韓国|中華/.test(genre)) {
+    return "bowl";
+  }
+  if (/カフェ|スイーツ|バー/.test(genre)) {
+    return "coffee";
+  }
+  return "utensils";
+}
+
+function calculateDistanceMeters(
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number },
+): number {
+  const earthRadiusMeters = 6371000;
+  const fromLat = toRadians(from.lat);
+  const toLat = toRadians(to.lat);
+  const deltaLat = toRadians(to.lat - from.lat);
+  const deltaLng = toRadians(to.lng - from.lng);
+  const a =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(fromLat) * Math.cos(toLat) * Math.sin(deltaLng / 2) ** 2;
+  return Math.round(
+    earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)),
+  );
+}
+
+function toRadians(value: number): number {
+  return (value * Math.PI) / 180;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
