@@ -18,12 +18,6 @@ import {
 import ShopList from "../components/ShopList.jsx";
 import SiteHeader from "../components/SiteHeader.jsx";
 
-// 初期表示に使うサンプル。ユーザーは自由に編集・増減できる。
-const DEFAULT_MEMBERS = [
-  "安くて美味しいお店がいい！\n落ち着いて話せる雰囲気だと嬉しい。\n和食か定食系が好きです。",
-  "静かな場所がいいです！\n駅から近いと助かる〜\nカフェっぽい雰囲気も気になる",
-];
-
 // 自由文の最大文字数。
 const MEMBER_MAX_LENGTH = 200;
 
@@ -44,7 +38,7 @@ export default function HomePage() {
   // 入力方法。"solo" = 1台で全員分入力 / "group" = 部屋を作って各自の端末で入力。
   const [mode, setMode] = useState("solo");
 
-  const [members, setMembers] = useState(DEFAULT_MEMBERS);
+  const [members, setMembers] = useState([""]);
   const [location, setLocation] = useState(DEFAULT_LOCATION);
   const [range, setRange] = useState(3);
   const [loading, setLoading] = useState(false);
@@ -98,6 +92,19 @@ export default function HomePage() {
   // エリアモードなのに中エリア未選択なら true（送信をブロックする）。
   function isAreaSelectionMissing() {
     return locationMode === "area" && !middleAreaCode;
+  }
+
+  function isAreaValidationStatus() {
+    return (
+      status?.kind === "validation" &&
+      status.message === "エリアを選択してください。"
+    );
+  }
+
+  function clearAreaValidationStatus() {
+    if (isAreaValidationStatus()) {
+      setStatus(null);
+    }
   }
 
   function updateMember(index, value) {
@@ -370,7 +377,12 @@ export default function HomePage() {
                         <button
                           key={option.value}
                           type="button"
-                          onClick={() => setLocationMode(option.value)}
+                          onClick={() => {
+                            setLocationMode(option.value);
+                            if (option.value === "current") {
+                              clearAreaValidationStatus();
+                            }
+                          }}
                           className={`rounded-lg py-2 text-sm font-semibold transition ${
                             active
                               ? "bg-base-100 text-primary shadow-sm"
@@ -427,6 +439,7 @@ export default function HomePage() {
                           setLargeAreaCode(e.target.value);
                           // 大エリアを変えたら中エリアの選択はリセットする。
                           setMiddleAreaCode("");
+                          clearAreaValidationStatus();
                         }}
                         aria-label="大エリア"
                       >
@@ -441,7 +454,12 @@ export default function HomePage() {
                       <select
                         className="select select-bordered w-full rounded-xl"
                         value={middleAreaCode}
-                        onChange={(e) => setMiddleAreaCode(e.target.value)}
+                        onChange={(e) => {
+                          setMiddleAreaCode(e.target.value);
+                          if (e.target.value) {
+                            clearAreaValidationStatus();
+                          }
+                        }}
                         disabled={!largeAreaCode}
                         aria-label="中エリア"
                       >
@@ -456,6 +474,12 @@ export default function HomePage() {
                           </option>
                         ))}
                       </select>
+
+                      {isAreaSelectionMissing() && isAreaValidationStatus() && (
+                        <p className="text-sm font-semibold text-error">
+                          エリアを選択してください。
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
