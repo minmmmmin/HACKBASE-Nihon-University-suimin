@@ -313,7 +313,7 @@ export default function HomePage() {
 
             {mode === "group" && (
               <p className="rounded-2xl bg-info/10 px-4 py-3 text-sm text-base-content/70">
-                エリアと検索範囲を決めて部屋を作ると、合言葉やQR相当のリンクで
+                エリアと検索範囲を決めて部屋を作ると、合言葉やQRコードで
                 みんなを招待できます。各自が
                 <span className="font-semibold">自分の端末</span>
                 で希望を入力するので、他の人の希望は見えません。

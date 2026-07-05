@@ -1,5 +1,5 @@
 import { Link, NavLink } from "react-router-dom";
-import { HistoryIcon, MenuIcon, PeopleIcon } from "./icons.jsx";
+import { MenuIcon, PeopleIcon } from "./icons.jsx";
 
 /** ヘッダーのナビ項目。デスクトップのナビとモバイルのメニューで共有する。 */
 const NAV_ITEMS = [
@@ -37,15 +37,6 @@ export default function SiteHeader() {
             </nav>
           </div>
 
-          {/* デスクトップ：履歴ボタン */}
-          <button
-            type="button"
-            className="hidden items-center gap-1.5 rounded-lg border border-base-300 px-3 py-1.5 text-sm font-medium transition hover:bg-base-200 lg:inline-flex"
-          >
-            <HistoryIcon className="h-4 w-4" />
-            履歴を見る
-          </button>
-
           {/* モバイル：ドロップダウンメニュー */}
           <div className="dropdown dropdown-end lg:hidden">
             <button
@@ -70,12 +61,6 @@ export default function SiteHeader() {
                   </NavLink>
                 </li>
               ))}
-              <li>
-                <button type="button" className="rounded-xl font-medium">
-                  <HistoryIcon className="h-4 w-4" />
-                  履歴を見る
-                </button>
-              </li>
             </ul>
           </div>
         </div>
