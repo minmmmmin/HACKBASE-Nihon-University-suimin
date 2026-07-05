@@ -8,13 +8,17 @@ const NAV_ITEMS = [
   { to: "/faq", label: "よくある質問" },
 ];
 
-export default function SiteHeader() {
+export default function SiteHeader({ onLogoClick }) {
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-30 border-b border-base-300 bg-base-100/95 backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-md items-center justify-between px-4 lg:max-w-6xl lg:px-8">
           <div className="flex items-center gap-2 lg:gap-3">
-            <Link to="/" className="flex items-center gap-2 lg:gap-3">
+            <Link
+              to="/"
+              onClick={onLogoClick}
+              className="flex items-center gap-2 lg:gap-3"
+            >
               <PeopleIcon className="h-6 w-6 text-accent lg:h-7 lg:w-7" />
               <span className="text-lg font-bold lg:text-xl">
                 みんなで決めるお店

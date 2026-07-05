@@ -148,6 +148,21 @@ export default function HomePage() {
     setStatus(null);
   }
 
+  // ロゴ押下でトップへ。入力内容・結果もすべて初期状態に戻す（＝まっさらな状態）。
+  function resetToTop() {
+    setView("input");
+    setStatus(null);
+    setResult(null);
+    setMode("solo");
+    setMembers([""]);
+    setRange(3);
+    setLocation(DEFAULT_LOCATION);
+    setLocationMode("current");
+    setLargeAreaCode("");
+    setMiddleAreaCode("");
+    setGeo({ kind: "idle" });
+  }
+
   function handleGetLocation() {
     if (!navigator.geolocation) {
       setGeo({
@@ -296,7 +311,8 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-base-200 text-base-content">
-      <SiteHeader />
+      {/* ロゴ押下でトップ（入力画面）へ戻し、入力内容も初期化する。 */}
+      <SiteHeader onLogoClick={resetToTop} />
 
       <main className="mx-auto w-full max-w-md px-4 pb-12 pt-4 lg:max-w-2xl lg:px-8 lg:pt-8">
         {/* 入力画面 → 検索 → 結果画面、と全サイズで画面を切り替える。 */}
