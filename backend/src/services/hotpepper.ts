@@ -86,7 +86,7 @@ async function searchShopsWithHotPepper(
     )
     .filter((item: ScoredShop | null): item is ScoredShop => item !== null)
     .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
+    .slice(0, 30)
     .map(({ shop }) => shop);
 }
 

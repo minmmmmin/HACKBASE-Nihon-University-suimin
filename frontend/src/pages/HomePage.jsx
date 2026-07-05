@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAreas } from "../api/areas.js";
 import { requestRecommendation } from "../api/recommend.js";
@@ -67,6 +67,7 @@ export default function HomePage() {
 
   // 表示中の画面。"input"（入力）→ 検索 →"result"（結果）へ遷移する。
   const [view, setView] = useState("input");
+  const resultTopRef = useRef(null);
 
   // エリア一覧を初回に取得する（失敗しても現在地モードは使える）。
   useEffect(() => {
@@ -581,6 +582,7 @@ export default function HomePage() {
           <div className="space-y-4">
             {/* 結果画面。上部の「条件を変更する」で入力画面へ戻れる。 */}
             <button
+              ref={resultTopRef}
               type="button"
               onClick={handleBackToInput}
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-base-content/70 transition hover:text-base-content"
@@ -597,6 +599,7 @@ export default function HomePage() {
                 <ShopList
                   shops={result.shops}
                   areaLabel={result.areaLabel}
+                  pageScrollTargetRef={resultTopRef}
                   rangeLabel={
                     // エリアモード（range=null）では範囲ラベルを出さない。
                     result.range

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BowlIcon,
   CoffeeIcon,
@@ -30,17 +30,24 @@ const SHOP_ICONS = {
   utensils: UtensilsIcon,
 };
 
+const SHOPS_PER_PAGE = 10;
+const PAGE_SCROLL_OFFSET_PX = 96;
+
 /**
  * 店舗一覧。AIおすすめ順（APIの配列順）と距離順を切り替えられる。
  *
- * @param {{ shops: Shop[], areaLabel?: string, rangeLabel?: string }} props
+ * @param {{ shops: Shop[], areaLabel?: string, rangeLabel?: string, pageScrollTargetRef?: import("react").RefObject<HTMLElement | null> }} props
  */
 export default function ShopList({
   shops,
   areaLabel = "現在地周辺",
   rangeLabel,
+  pageScrollTargetRef,
 }) {
   const [sortBy, setSortBy] = useState("recommended");
+  const [page, setPage] = useState(1);
+  const listTopRef = useRef(null);
+  const previousPageRef = useRef(null);
 
   const sortedShops = useMemo(() => {
     if (sortBy === "distance") {
@@ -50,9 +57,43 @@ export default function ShopList({
     // recommended: APIが返した配列順（おすすめ順）をそのまま使う。
     return shops;
   }, [shops, sortBy]);
+  const pageCount = Math.max(1, Math.ceil(sortedShops.length / SHOPS_PER_PAGE));
+  const currentPage = Math.min(page, pageCount);
+  const visibleShops = sortedShops.slice(
+    (currentPage - 1) * SHOPS_PER_PAGE,
+    currentPage * SHOPS_PER_PAGE,
+  );
+
+  function handleSortChange(value) {
+    setSortBy(value);
+    setPage(1);
+  }
+
+  useEffect(() => {
+    if (previousPageRef.current === null) {
+      previousPageRef.current = currentPage;
+      return;
+    }
+    if (previousPageRef.current !== currentPage) {
+      const target = pageScrollTargetRef?.current ?? listTopRef.current;
+      if (target) {
+        window.scrollTo({
+          top: Math.max(
+            0,
+            target.getBoundingClientRect().top +
+              window.scrollY -
+              PAGE_SCROLL_OFFSET_PX,
+          ),
+          left: 0,
+          behavior: "auto",
+        });
+      }
+      previousPageRef.current = currentPage;
+    }
+  }, [currentPage, pageScrollTargetRef]);
 
   return (
-    <div className="space-y-3">
+    <div ref={listTopRef} className="space-y-3">
       <div className="flex items-center gap-1.5 text-sm text-base-content/70">
         <LocationPinIcon className="h-4 w-4 shrink-0 text-primary" />
         <span>
@@ -66,7 +107,7 @@ export default function ShopList({
         <select
           className="select select-sm w-fit rounded-full border-base-300 bg-base-100 font-medium"
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
+          onChange={(e) => handleSortChange(e.target.value)}
           aria-label="並び替え"
         >
           <option value="recommended">AIおすすめ順</option>
@@ -79,13 +120,39 @@ export default function ShopList({
           条件に合うお店が見つかりませんでした。範囲を広げてみてください。
         </div>
       ) : (
-        <ul className="space-y-3">
-          {sortedShops.map((shop) => (
-            <li key={shop.id}>
-              <ShopCard shop={shop} />
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="space-y-3">
+            {visibleShops.map((shop) => (
+              <li key={shop.id}>
+                <ShopCard shop={shop} />
+              </li>
+            ))}
+          </ul>
+
+          {pageCount > 1 && (
+            <div className="flex items-center justify-between gap-3 rounded-2xl bg-base-100 px-3 py-2 shadow-sm">
+              <button
+                type="button"
+                className="btn btn-sm rounded-xl"
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                前へ
+              </button>
+              <span className="text-sm font-semibold text-base-content/70">
+                {currentPage} / {pageCount}
+              </span>
+              <button
+                type="button"
+                className="btn btn-sm btn-primary rounded-xl"
+                onClick={() => setPage((prev) => Math.min(pageCount, prev + 1))}
+                disabled={currentPage === pageCount}
+              >
+                次へ
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
