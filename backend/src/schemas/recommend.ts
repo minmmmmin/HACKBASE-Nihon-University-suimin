@@ -5,7 +5,7 @@ import { z } from "zod";
  *
  * 位置の指定方法は2通りのどちらか：
  *   - 現在地モード: location(lat/lng) + range
- *   - エリアモード: areaCode（中エリアコード）(+ areaName は表示用の任意)
+ *   - エリアモード: areaCode（大エリア/中エリアコード）(+ areaName は表示用の任意)
  */
 
 /** 位置情報（現在地モード）。 */
@@ -28,12 +28,14 @@ export const rangeSchema = z
   .max(5, "検索範囲は1〜5で入力してください")
   .default(3);
 
-/** 中エリアコード（エリアモード）。表示名は任意で受け取る。 */
+/** エリアコード（大エリア/中エリア）。表示名は任意で受け取る。 */
 export const areaCodeSchema = z
   .string({ invalid_type_error: "エリアコードは文字列で送信してください" })
   .trim()
   .min(1, "エリアコードが空です")
   .max(20, "エリアコードが不正です");
+
+export const areaLevelSchema = z.enum(["large", "middle"]).default("middle");
 
 export const areaNameSchema = z
   .string({ invalid_type_error: "エリア名は文字列で送信してください" })
@@ -61,6 +63,7 @@ export const recommendRequestSchema = z
     location: locationSchema.optional(),
     range: rangeSchema,
     areaCode: areaCodeSchema.optional(),
+    areaLevel: areaLevelSchema.optional(),
     areaName: areaNameSchema.optional(),
     members: z.array(memberSchema).min(1, "少なくとも1人分の入力が必要です"),
   })

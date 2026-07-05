@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { findMiddleArea } from "../data/areas.js";
 import { recommendRequestSchema } from "../schemas/recommend.js";
 import { parseGroupPreferences } from "../services/gemini.js";
 import { searchShops } from "../services/hotpepper.js";
@@ -18,10 +17,7 @@ export function resolveResultMeta(request: {
   range: number;
 }): { areaLabel: string; range: number | null } {
   if (!request.location && request.areaCode) {
-    const label =
-      request.areaName ??
-      findMiddleArea(request.areaCode)?.name ??
-      "指定エリア";
+    const label = request.areaName ?? "指定エリア";
     return { areaLabel: label, range: null };
   }
   return { areaLabel: "現在地周辺", range: request.range };

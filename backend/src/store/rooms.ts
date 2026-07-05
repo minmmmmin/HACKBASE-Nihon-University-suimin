@@ -35,8 +35,9 @@ export interface Room {
   /** 現在地モードの座標。エリアモードでは未設定。 */
   location?: { lat: number; lng: number };
   range: number;
-  /** エリアモードの中エリアコード・表示名。現在地モードでは未設定。 */
+  /** エリアモードの大エリア/中エリアコード・表示名。現在地モードでは未設定。 */
   areaCode?: string;
+  areaLevel?: "large" | "middle";
   areaName?: string;
   members: RoomMember[];
   /** collecting: 希望を集めている / done: 検索実行済み。 */
@@ -74,6 +75,7 @@ export function createRoom(input: {
   location?: { lat: number; lng: number };
   range: number;
   areaCode?: string;
+  areaLevel?: "large" | "middle";
   areaName?: string;
 }): Room {
   const room: Room = {
@@ -82,6 +84,7 @@ export function createRoom(input: {
     location: input.location,
     range: input.range,
     areaCode: input.areaCode,
+    areaLevel: input.areaLevel,
     areaName: input.areaName,
     members: [],
     status: "collecting",

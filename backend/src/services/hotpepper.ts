@@ -66,7 +66,9 @@ async function searchShopsWithHotPepper(
     url.searchParams.set("lng", String(request.location.lng));
     url.searchParams.set("range", String(request.range));
   } else if (request.areaCode) {
-    url.searchParams.set("middle_area", request.areaCode);
+    const areaParam =
+      request.areaLevel === "large" ? "large_area" : "middle_area";
+    url.searchParams.set(areaParam, request.areaCode);
   }
 
   const response = await fetch(url);

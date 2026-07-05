@@ -154,10 +154,11 @@ project-root/
 │   │   ├── routes/
 │   │   │   ├── recommend.ts      # POST /api/recommend
 │   │   │   ├── rooms.ts          # ルーム作成・参加・結果取得
-│   │   │   └── areas.ts          # エリア選択用マスタ
+│   │   │   └── areas.ts          # HotPepper エリアマスタ取得
 │   │   ├── schemas/
 │   │   │   └── recommend.ts      # Zod スキーマ
 │   │   ├── services/
+│   │   │   ├── areas.ts          # HotPepper エリアマスタAPI 接続
 │   │   │   ├── gemini.ts         # Gemini API 接続
 │   │   │   └── hotpepper.ts      # HotPepper API 接続
 │   │   ├── app.ts                # Express アプリ設定
@@ -260,7 +261,6 @@ project-root/
 ## 今後の実装予定箇所
 
 - **永続化**: 現在のルーム情報はメモリストアです。再起動で消えるため、必要に応じてDBへ置き換えます。
-- **エリアマスタ**: 現在は `backend/src/data/areas.ts` の静的マスタです。必要に応じて HotPepper のエリアマスタAPIへ置き換えます。
 
 ## UI（Tailwind CSS / DaisyUI）
 

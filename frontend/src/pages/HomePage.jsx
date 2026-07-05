@@ -33,6 +33,8 @@ const RANGE_OPTIONS = [
   { code: 5, label: "3km" },
 ];
 
+const LARGE_AREA_ALL_VALUE = "__large_area_all__";
+
 export default function HomePage() {
   const navigate = useNavigate();
 
@@ -79,13 +81,29 @@ export default function HomePage() {
   const middleAreaOptions = areas.middleAreas.filter(
     (m) => m.largeAreaCode === largeAreaCode,
   );
+  const selectedLargeArea = areas.largeAreas.find(
+    (area) => area.code === largeAreaCode,
+  );
 
   // 送信ペイロードの位置指定部分を組み立てる。
   // エリアモードは { areaCode, areaName }、現在地モードは { location, range }。
   function buildLocationPayload() {
     if (locationMode === "area" && middleAreaCode) {
+      if (middleAreaCode === LARGE_AREA_ALL_VALUE) {
+        return {
+          areaCode: largeAreaCode,
+          areaLevel: "large",
+          areaName: selectedLargeArea
+            ? `${selectedLargeArea.name} 全域`
+            : "選択エリア全域",
+        };
+      }
       const selected = areas.middleAreas.find((m) => m.code === middleAreaCode);
-      return { areaCode: middleAreaCode, areaName: selected?.name };
+      return {
+        areaCode: middleAreaCode,
+        areaLevel: "middle",
+        areaName: selected?.name,
+      };
     }
     return { location, range };
   }
@@ -472,6 +490,11 @@ export default function HomePage() {
                             ? "詳しいエリアを選ぶ"
                             : "先に上のエリアを選んでください"}
                         </option>
+                        {selectedLargeArea && (
+                          <option value={LARGE_AREA_ALL_VALUE}>
+                            {selectedLargeArea.name} 全域
+                          </option>
+                        )}
                         {middleAreaOptions.map((area) => (
                           <option key={area.code} value={area.code}>
                             {area.name}

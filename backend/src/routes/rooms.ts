@@ -155,6 +155,7 @@ router.post("/:id/recommend", async (req, res, next) => {
       location: room.location,
       range: room.range,
       areaCode: room.areaCode,
+      areaLevel: room.areaLevel,
       areaName: room.areaName,
       members: room.members.map((m) => ({ text: m.text })),
     };

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   areaCodeSchema,
+  areaLevelSchema,
   areaNameSchema,
   hasLocationOrArea,
   locationSchema,
@@ -18,6 +19,7 @@ export const createRoomSchema = z
     location: locationSchema.optional(),
     range: rangeSchema,
     areaCode: areaCodeSchema.optional(),
+    areaLevel: areaLevelSchema.optional(),
     areaName: areaNameSchema.optional(),
   })
   .refine(hasLocationOrArea, {
