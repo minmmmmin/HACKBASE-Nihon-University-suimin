@@ -4,6 +4,7 @@ const API_BASE_URL =
 /**
  * @typedef {Object} RecommendPayload
  * @property {{ lat: number, lng: number }} location
+ * @property {1 | 2 | 3 | 4 | 5} range  検索範囲コード（1=300m,2=500m,3=1000m,4=2000m,5=3000m）
  * @property {{ text: string }[]} members
  */
 
