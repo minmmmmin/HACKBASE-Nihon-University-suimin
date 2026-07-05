@@ -96,7 +96,15 @@ router.post("/", async (req, res, _next) => {
   );
   console.log(geminiReply2);
 
-  const result = JSON.parse(geminiReply2!);
+  if (!geminiReply2) {
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Geminiから推薦結果を取得できませんでした",
+    });
+    return;
+  }
+
+  const result = JSON.parse(geminiReply2);
   // console.log("AI says" + geminiReply1);
   res.status(200).send(result);
 });

@@ -3,7 +3,6 @@ import {
   BookIcon,
   LocationPinIcon,
   PeopleIcon,
-  QuestionIcon,
   SparklesIcon,
   YenIcon,
 } from "../components/icons.jsx";
