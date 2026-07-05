@@ -21,6 +21,7 @@ import {
  * @property {number} [matchScore]      AIが算出した相性スコア（%）
  * @property {"bowl" | "coffee" | "utensils"} [iconType]  サムネイルの種類
  * @property {string} [url]             HotPepperの店舗詳細URL
+ * @property {string} [imageUrl]        HotPepperの店舗写真URL
  */
 
 /** サムネイルアイコンの種類マップ。未指定・不明な種類はフォークで代替する。 */
@@ -168,8 +169,17 @@ function ShopCard({ shop }) {
   return (
     <article className="overflow-hidden rounded-2xl border border-base-300 bg-base-100 shadow-sm">
       <div className="flex gap-3 p-3">
-        <div className="grid h-20 w-20 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary/15 to-accent/20 text-primary/70">
-          <ThumbIcon className="h-9 w-9" />
+        <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-primary/15 to-accent/20 text-primary/70">
+          {shop.imageUrl ? (
+            <img
+              src={shop.imageUrl}
+              alt=""
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <ThumbIcon className="h-9 w-9" />
+          )}
         </div>
 
         <div className="min-w-0 flex-1">

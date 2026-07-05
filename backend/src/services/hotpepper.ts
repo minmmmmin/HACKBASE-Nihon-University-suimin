@@ -16,6 +16,7 @@ export interface ShopRecommendation {
   matchScore: number;
   iconType: "bowl" | "coffee" | "utensils";
   url?: string;
+  imageUrl?: string;
 }
 
 interface HotPepperShop {
@@ -28,6 +29,17 @@ interface HotPepperShop {
   lat?: number;
   lng?: number;
   urls?: { pc?: string };
+  photo?: {
+    pc?: {
+      l?: string;
+      m?: string;
+      s?: string;
+    };
+    mobile?: {
+      l?: string;
+      s?: string;
+    };
+  };
 }
 
 interface ScoredShop {
@@ -139,6 +151,7 @@ function toScoredRecommendation(
       matchScore: clamp(Math.round(65 + score * 4), 60, 98),
       iconType: pickIconType(genre),
       url: shop.urls?.pc,
+      imageUrl: pickImageUrl(shop),
     },
   };
 }
@@ -245,6 +258,10 @@ function pickIconType(genre: string): ShopRecommendation["iconType"] {
     return "coffee";
   }
   return "utensils";
+}
+
+function pickImageUrl(shop: HotPepperShop): string | undefined {
+  return shop.photo?.pc?.m ?? shop.photo?.pc?.l ?? shop.photo?.mobile?.l;
 }
 
 function calculateDistanceMeters(
